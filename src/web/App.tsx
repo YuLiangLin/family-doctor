@@ -66,7 +66,10 @@ export function App() {
 function Shell() {
   const release = useNewRelease();
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  // 大括號不能省：新版瀏覽器的 scrollTo 回傳 Promise，直接回傳會被 React 當成 cleanup 呼叫，一換頁整個畫面就變白
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return (
     <>
       <div className="app">

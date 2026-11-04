@@ -100,6 +100,11 @@ for (const scheme of ['light', 'dark']) {
       await page.screenshot({ path: `${SHOTS}${scheme}-today-ticked.png` });
     }
   }
+  // 站內換頁（不重新載入）：換頁時 effect 的 cleanup 出錯會整頁變白，下面的整頁載入測不到
+  for (const name of ['紀錄', 'Dr.Claude', '看診', '家人', '今天']) {
+    await page.getByRole('link', { name, exact: true }).click();
+    await page.waitForTimeout(300);
+  }
   await shot('/log', 'log');
   await shot(`/family/${dad}`, 'member');
   await shot(`/visits/${visit.id}`, 'visit');
