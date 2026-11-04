@@ -1,0 +1,22 @@
+# Dr.Claude 服務（使用者層級的 systemd 服務）。安裝步驟見 docs/部署指南.md §4：
+#   mkdir -p ~/.config/systemd/user && cp scripts/dr-claude-runner/dr-claude.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now dr-claude
+#   sudo loginctl enable-linger "$USER"      # 沒登入桌面也會跑、開機自動啟動
+# 看狀態：systemctl --user status dr-claude；看紀錄：journalctl --user -u dr-claude -f
+# 路徑假設 repo clone 在 ~/family-doctor；放別的地方就改下面兩行。
+[Unit]
+Description=家庭醫生 Dr.Claude 服務
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/family-doctor
+ExecStart=%h/family-doctor/scripts/dr-claude-runner/.venv/bin/python scripts/dr-claude-runner/runner.py
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=30
+TimeoutStopSec=420
+
+[Install]
+WantedBy=default.target

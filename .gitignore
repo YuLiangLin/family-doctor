@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+*.log
+coverage/
+# 含個資的匯入檔、資料庫備份一律不進 repo
+*.accdb
+*.mdb
+data-import/
+backups/
+e2e-shots/
+e2e-server.log
+__pycache__/
+# Python venv（AI 評估服務 scripts/ai-eval-runner/.venv）
+.venv/

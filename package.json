@@ -1,0 +1,43 @@
+{
+  "name": "family-doctor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "wrangler dev --port 8787",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run test && vite build",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "deploy": "npm run build && wrangler d1 migrations apply DB --remote && wrangler deploy",
+    "e2e": "bash scripts/e2e.sh",
+    "icons": "node scripts/gen-icons.mjs"
+  },
+  "dependencies": {
+    "@react-three/fiber": "^9.4.0",
+    "hono": "^4.13.0",
+    "jose": "^6.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.13.0",
+    "three": "^0.181.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261006.1",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.181.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "playwright-core": "1.56.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.0",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.140.0"
+  }
+}
