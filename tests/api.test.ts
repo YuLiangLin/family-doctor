@@ -277,7 +277,7 @@ describe('Dr.Claude', () => {
       advice: '',
       followUpDate: null,
       copay: 200,
-      medications: MEDS.map((m) => ({ purpose: '', appearance: '', dose: '1 顆', asNeeded: false, cautions: '', mustFinish: false, genericName: '', category: '', ...m })) as VisitDraft['medications'],
+      medications: MEDS.map((m) => ({ purpose: '', appearance: '', dose: '1 顆', asNeeded: false, cautions: '', mustFinish: false, ...m })) as VisitDraft['medications'],
       uncertain: ['醫師名字字跡不清'],
     };
     expect((await call('POST', `/agent/jobs/${claim.json.id}/complete`, { as: RUNNER, body: { draft } })).status).toBe(200);

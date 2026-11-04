@@ -59,6 +59,8 @@ export default defineConfig({
   },
   build: {
     outDir: '../../dist/client',
+    // 3D 醫生（three.js）是 lazy 載入的獨立檔案，比較大是正常的
+    chunkSizeWarningLimit: 1000,
     emptyOutDir: true,
   },
   server: {

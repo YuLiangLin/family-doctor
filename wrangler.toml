@@ -24,8 +24,8 @@ run_worker_first = ["/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "family-doctor"
-# 部署指南 §2：wrangler d1 create family-doctor 之後把 id 貼到這裡
-database_id = "00000000-0000-0000-0000-000000000000"
+# 2026-11-04 建立（APAC）
+database_id = "3019930a-3730-4c06-b100-83648674c467"
 migrations_dir = "migrations"
 
 # 藥袋、收據、病灶照片（私有 bucket，只能經由 /api/attachments 讀取）

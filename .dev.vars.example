@@ -1,0 +1,5 @@
+# 複製成 .dev.vars（不進 git）。本機開發略過 Cloudflare Access，以這個帳號身分登入（只在 localhost 生效）。
+# 本機測試 runner：改成 DEV_AUTH_EMAIL=agent:dev-runner.access（這時畫面進不去，只有 /api/agent 能用）
+DEV_AUTH_EMAIL=dev@example.com
+SUPER_ADMINS=dev@example.com
+AGENT_CLIENT_IDS=dev-runner.access=本機測試

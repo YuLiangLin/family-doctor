@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   deploy:
-    # 跑在哪台機器：repo variable RUNNER（自架 runner 設 self-hosted）；沒設就用 GitHub 的 ubuntu-latest。見 docs/部署指南.md §1-1
+    # 跑在哪台機器：repo variable RUNNER（自架 runner 設 self-hosted）；沒設就用 GitHub 的 ubuntu-latest。見 docs/部署指南.md §1
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -29,6 +29,8 @@ jobs:
         run: npm run typecheck
       - name: Test
         run: npm test
+      - name: Test Dr.Claude runner
+        run: python3 -m unittest scripts/dr-claude-runner/test_runner.py
       - name: Build
         run: npx vite build
       - name: Check Cloudflare credentials

@@ -7,7 +7,7 @@ on:
 
 jobs:
   check:
-    # 跑在哪台機器：repo variable RUNNER（自架 runner 設 self-hosted）；沒設就用 GitHub 的 ubuntu-latest。見 docs/部署指南.md §1-1
+    # 跑在哪台機器：repo variable RUNNER（自架 runner 設 self-hosted）；沒設就用 GitHub 的 ubuntu-latest。見 docs/部署指南.md §1
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
@@ -20,5 +20,7 @@ jobs:
         run: npm run typecheck
       - name: Test
         run: npm test
+      - name: Test Dr.Claude runner
+        run: python3 -m unittest scripts/dr-claude-runner/test_runner.py
       - name: Build
         run: npx vite build
