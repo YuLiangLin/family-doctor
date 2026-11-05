@@ -6,8 +6,9 @@ cd "$(dirname "$0")/.."
 [ -d dist/client ] || npm run build
 rm -rf .wrangler/state
 npx wrangler d1 migrations apply DB --local >/dev/null
-npx wrangler dev --port 8787 > e2e-server.log 2>&1 &
+# 自己一個 process group：結束時連 wrangler 底下的 workerd 一起關掉（只關 npx 會留下舊的伺服器佔著 8787）
+setsid npx wrangler dev --port 8787 > e2e-server.log 2>&1 &
 PID=$!
-trap 'kill $PID 2>/dev/null || true' EXIT
+trap 'kill -- -$PID 2>/dev/null || kill $PID 2>/dev/null || true' EXIT
 for _ in $(seq 1 60); do curl -sf http://127.0.0.1:8787/api/me >/dev/null 2>&1 && break; sleep 1; done
 node scripts/e2e.mjs

@@ -1,4 +1,5 @@
-// 用說的問、聽 Dr.Claude 回答：瀏覽器內建的語音辨識與朗讀（不送到其他服務；iPhone Safari、Android Chrome 都有）
+// 用說的問、聽 Dr.Claude 回答：瀏覽器內建的語音辨識與朗讀（iPhone Safari、Android Chrome 都有）。
+// 注意：語音轉文字是瀏覽器交給自家服務做的（Chrome → Google、iPhone → Apple），朗讀在裝置上做；我們的伺服器只收到轉好的文字。
 
 interface RecognitionLike {
   lang: string;
@@ -84,4 +85,23 @@ export function speak(text: string, on: { start?: () => void; end?: () => void }
   u.onerror = () => on.end?.();
   speechSynthesis.speak(u);
   return () => speechSynthesis.cancel();
+}
+
+/**
+ * iPhone 的朗讀要在「使用者按了按鈕」那一刻先念過一次，之後 Dr.Claude 回覆時才能自動念出來。
+ * 打開語音對話／朗讀的那一下先念一個聽不到的空白。
+ */
+export function unlockSpeech() {
+  if (!canSpeak()) return;
+  try {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    speechSynthesis.speak(u);
+  } catch {
+    // 不支援就算了：回覆時按喇叭也能念
+  }
+}
+
+export function stopSpeaking() {
+  if (canSpeak()) speechSynthesis.cancel();
 }

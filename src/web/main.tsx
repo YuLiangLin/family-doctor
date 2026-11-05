@@ -4,8 +4,10 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { captureInstallPrompt } from './installApp';
 import { listenForNotificationClicks } from './push';
+import { applyTheme, readTheme } from './theme';
 import './styles.css';
 
+applyTheme(readTheme());
 captureInstallPrompt();
 listenForNotificationClicks();
 

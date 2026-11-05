@@ -2,6 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 import type { Me, Member } from '../shared/apiTypes';
 import { api, ApiRequestError } from './api';
 
+const CHANGED = 'fd:data-changed';
+
+/** 有東西寫進資料庫了（記身體狀況、量測、打勾…）：畫面上所有 useApi 重抓一次 */
+export function emitDataChanged() {
+  window.dispatchEvent(new Event(CHANGED));
+}
+
 export interface AsyncState<T> {
   data: T | null;
   error: ApiRequestError | null;
@@ -42,6 +49,11 @@ export function useApi<T>(path: string | null): AsyncState<T> {
   }, [path, tick]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
+  useEffect(() => {
+    if (path === null) return;
+    window.addEventListener(CHANGED, reload);
+    return () => window.removeEventListener(CHANGED, reload);
+  }, [path, reload]);
   return { data, error, loading, reload };
 }
 
@@ -79,6 +91,14 @@ export function useSession(): Session {
   if (!s) throw new Error('SessionContext 未設定');
   return s;
 }
+
+/** 新增選單、記身體狀況、記量測（全站共用一份，在 App 的 Shell 裡） */
+export type QuickKind = 'menu' | 'note' | 'temperature' | 'measure';
+export interface QuickAdd {
+  open: (kind: QuickKind, opts?: { memberId?: number | null }) => void;
+}
+export const QuickContext = createContext<QuickAdd>({ open: () => undefined });
+export const useQuick = () => useContext(QuickContext);
 
 export function useMember(id: number | null | undefined): Member | undefined {
   const { members } = useSession();

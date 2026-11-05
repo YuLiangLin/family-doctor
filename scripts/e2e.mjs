@@ -33,6 +33,7 @@ const sql = (q) => execFileSync('npx', ['wrangler', 'd1', 'execute', 'DB', '--lo
 // ---- 假資料 ----
 const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 const yesterday = new Date(Date.now() + 8 * 3600e3 - 86400e3).toISOString().slice(0, 10);
+const inThreeDays = new Date(Date.now() + 8 * 3600e3 + 3 * 86400e3).toISOString().slice(0, 10);
 await api('GET', '/me');
 const dad = (await api('POST', '/members', { name: '爸爸', relation: '本人', birthDate: '1985-03-27', sex: 'M', emoji: '👨', color: '#1f5fbf', conditions: '幾年前肺炎住院過' })).id;
 await api('POST', '/members', { name: '媽媽', relation: '太太', emoji: '👩', color: '#c0507a', sortOrder: 1 });
@@ -47,6 +48,7 @@ const visit = await api('POST', '/visits', {
   reason: '黃鼻涕、鼻塞',
   diagnosis: '急性鼻竇炎',
   advice: '多喝水，三天沒改善回診',
+  followUpDate: inThreeDays,
   copay: 200,
   medications: [
     { name: 'CEPHALEXIN 500MG', genericName: 'Cephalexin', category: '抗生素', purpose: '殺細菌', appearance: '綠白膠囊', slots: ['morning', 'noon', 'evening'], days: 3, mustFinish: true },
@@ -79,40 +81,83 @@ sql(
 // ---- 截圖 ----
 const browser = await chromium.launch({ executablePath: findChromium(), args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const errors = [];
+const watch = (page, label) => {
+  page.on('console', (m) => m.type() === 'error' && !/fonts\.g|ERR_TUNNEL_CONNECTION_FAILED/.test(m.text()) && errors.push(`${label} ${page.url()}: ${m.text()}`));
+  page.on('pageerror', (e) => errors.push(`${label} ${page.url()}: ${e.message}`));
+};
+const shooter = (page, prefix) => async (path, name, wait = 700) => {
+  await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(wait);
+  await page.screenshot({ path: `${SHOTS}${prefix}-${name}.png`, fullPage: !name.startsWith('doctor') });
+  console.log('✓', prefix, name);
+};
+
 for (const scheme of ['light', 'dark']) {
+  // 手機（iPhone 寬度）
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: scheme, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
-  page.on('console', (m) => m.type() === 'error' && !/fonts\.g|ERR_TUNNEL_CONNECTION_FAILED/.test(m.text()) && errors.push(`${scheme} ${page.url()}: ${m.text()}`));
-  page.on('pageerror', (e) => errors.push(`${scheme} ${page.url()}: ${e.message}`));
-  const shot = async (path, name, wait = 600) => {
-    await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(wait);
-    await page.screenshot({ path: `${SHOTS}${scheme}-${name}.png`, fullPage: name !== 'doctor' });
-    console.log('✓', scheme, name);
-  };
+  watch(page, `${scheme} 手機`);
+  const shot = shooter(page, scheme);
   await shot('/', 'today');
   if (scheme === 'light') {
     // 打勾：中午那包抗生素
     const tick = page.getByRole('button', { name: /CEPHALEXIN 500MG 中午按一下記已吃/ });
     if (await tick.count()) {
       await tick.click();
-      await page.waitForTimeout(700);
+      await page.waitForTimeout(900);
       await page.screenshot({ path: `${SHOTS}${scheme}-today-ticked.png` });
     }
   }
   // 站內換頁（不重新載入）：換頁時 effect 的 cleanup 出錯會整頁變白，下面的整頁載入測不到
-  for (const name of ['紀錄', 'Dr.Claude', '看診', '家人', '今天']) {
+  for (const name of ['紀錄', 'Dr.Claude', '家人', '今天']) {
     await page.getByRole('link', { name, exact: true }).click();
     await page.waitForTimeout(300);
   }
+  // 新增選單 → 量體溫面板
+  await page.getByRole('button', { name: '新增', exact: true }).click();
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `${SHOTS}${scheme}-add-menu.png` });
+  await page.getByRole('dialog').getByRole('button', { name: /量體溫/ }).click();
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `${SHOTS}${scheme}-add-temperature.png` });
+  await page.keyboard.press('Escape');
   await shot('/log', 'log');
+  await shot('/family', 'family');
   await shot(`/family/${dad}`, 'member');
+  // App 內的對話框（取代 prompt）：停藥要寫原因
+  await page.getByRole('button', { name: '停藥' }).first().click();
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${SHOTS}${scheme}-dialog.png` });
+  await page.getByRole('button', { name: '取消' }).click();
   await shot(`/visits/${visit.id}`, 'visit');
   await shot('/visits/new', 'visit-new');
   await shot(`/doctor/${conv.id}`, 'doctor', 2500);
   await shot('/doctor', 'doctor-new', 2500);
+  // 語音對話模式（只看畫面；headless 沒有麥克風）
+  const voiceBtn = page.getByRole('button', { name: '語音對話' });
+  if (await voiceBtn.count()) {
+    await voiceBtn.click();
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `${SHOTS}${scheme}-doctor-voice.png` });
+    await voiceBtn.click(); // 關掉，免得下一頁也是語音模式
+  }
   await shot('/settings', 'settings');
   await ctx.close();
+
+  // 電腦（筆電 1440×900）
+  const dctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, colorScheme: scheme });
+  const dpage = await dctx.newPage();
+  watch(dpage, `${scheme} 電腦`);
+  const dshot = shooter(dpage, `${scheme}-desktop`);
+  await dshot('/', 'today');
+  await dshot('/log', 'log');
+  await dshot('/family', 'family');
+  await dshot(`/family/${dad}`, 'member');
+  await dshot(`/visits/${visit.id}`, 'visit');
+  await dshot('/visits/new', 'visit-new');
+  await dshot(`/doctor/${conv.id}`, 'doctor', 2500);
+  await dshot('/settings', 'settings');
+  await dctx.close();
 }
 await browser.close();
 if (errors.length) {
