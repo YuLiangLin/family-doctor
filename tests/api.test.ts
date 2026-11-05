@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   AgentJobContext,
+  ApiToken,
+  CreatedApiToken,
   ConversationDetail,
   Me,
   MemberDetail,
@@ -9,7 +11,7 @@ import type {
   VisitDetail,
   VisitDraft,
 } from '../src/shared/apiTypes';
-import { agentMayCall } from '../src/worker/auth';
+import { agentMayCall, tokenMayCall } from '../src/worker/auth';
 import type { Env } from '../src/worker/env';
 import { app } from '../src/worker/index';
 import { ageText } from '../src/worker/routes/agent';
@@ -122,6 +124,102 @@ describe('登入白名單', () => {
   it('改資料只收 JSON（擋 CSRF）', async () => {
     const res = await app.request('http://localhost/api/members', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{}' }, env({ DEV_AUTH_EMAIL: ADMIN }));
     expect(res.status).toBe(415);
+  });
+});
+
+describe('API token', () => {
+  /** 用 token 呼叫：不帶 DEV_AUTH_EMAIL 的人，只靠 Authorization */
+  const withToken = <T = unknown>(token: string, method: string, path: string, body?: unknown) =>
+    call<T>(method, path, { body, headers: { Authorization: `Bearer ${token}` }, env: { DEV_AUTH_EMAIL: '' } });
+  const make = async (scope: 'read' | 'log' | 'write', days = 30, as = ADMIN) =>
+    call<CreatedApiToken>('POST', '/tokens', { as, body: { name: 'Claude Code', scope, days } });
+
+  it('只有最高管理者能建；最長一年；token 只顯示一次、資料庫只存雜湊', async () => {
+    await seed();
+    expect((await make('read', 30, MOM)).status).toBe(403);
+    expect((await make('read', 366)).status).toBe(400);
+    const t = await make('read', 365);
+    expect(t.status).toBe(201);
+    expect(t.json.token).toMatch(/^fdt_[A-Za-z0-9_-]{40,}$/);
+    expect(t.json.expiresAt.slice(0, 10)).toBe('2027-11-04');
+    const list = await call<ApiToken[]>('GET', '/tokens');
+    expect(list.json).toHaveLength(1);
+    expect(JSON.stringify(list.json)).not.toContain(t.json.token);
+    const stored = shim.asD1().prepare('SELECT token_hash FROM api_tokens').bind();
+    expect(JSON.stringify(await stored.all())).not.toContain(t.json.token);
+  });
+
+  it('唯讀：能看、不能寫；都不能管帳號、建 token、走 /api/agent', async () => {
+    const { dad } = await seed();
+    const t = (await make('read')).json.token;
+    expect((await withToken(t, 'GET', '/today')).status).toBe(200);
+    expect((await withToken<MemberDetail>(t, 'GET', `/members/${dad}`)).json.member.name).toBe('Nathan');
+    expect((await withToken(t, 'POST', '/notes', { memberId: dad, notedAt: '2026-11-04 12:00', body: '咳嗽' })).status).toBe(403);
+    expect((await withToken(t, 'GET', '/users')).status).toBe(403);
+    expect((await withToken(t, 'GET', '/tokens')).status).toBe(403);
+    expect((await withToken(t, 'POST', '/tokens', { name: 'x', scope: 'write', days: 1 })).status).toBe(403);
+    expect((await withToken(t, 'POST', '/agent/jobs/claim', {})).status).toBe(403);
+    expect((await withToken(t, 'GET', '/chat/conversations')).status).toBe(403);
+  });
+
+  it('記日常：能記身體狀況、量測、打勾；不能改家人、看診、用藥', async () => {
+    const { dad } = await seed();
+    const t = (await make('log')).json.token;
+    expect((await withToken(t, 'POST', '/notes', { memberId: dad, notedAt: '2026-11-04 12:00', body: '咳嗽' })).status).toBe(201);
+    expect((await withToken(t, 'POST', '/measurements', { memberId: dad, kind: 'temperature', value: 37.8, measuredAt: '2026-11-04 12:00' })).status).toBe(201);
+    expect((await withToken(t, 'POST', '/members', { name: '阿嬤' })).status).toBe(403);
+    expect((await withToken(t, 'POST', '/medications', { memberId: dad, startDate: '2026-11-04', name: '退燒藥', asNeeded: true })).status).toBe(403);
+  });
+
+  it('完整寫入：看診與用藥直接生效，紀錄標記是哪把 token 建的', async () => {
+    const { dad } = await seed();
+    const t = await make('write');
+    const v = await withToken<{ id: number }>(t.json.token, 'POST', '/visits', { memberId: dad, visitDate: '2026-11-04', clinic: '測試診所', medications: MEDS });
+    expect(v.status).toBe(201);
+    const visit = await call<VisitDetail>('GET', `/visits/${v.json.id}`);
+    expect(visit.json.createdBy).toBe(`token:${t.json.id}:Claude Code`);
+    expect(visit.json.medications.every((m) => m.createdBy === `token:${t.json.id}:Claude Code`)).toBe(true);
+    expect((await call<TodayResponse>('GET', '/today')).json.medications).toHaveLength(3);
+    expect((await withToken(t.json.token, 'POST', `/members/${dad}/active`, { active: false })).status).toBe(403);
+    const list = await call<ApiToken[]>('GET', '/tokens');
+    expect(list.json[0].lastUsedAt).not.toBeNull();
+  });
+
+  it('撤銷、過期、帳號停用、亂打的 token 一律 401', async () => {
+    await seed();
+    const a = await make('read', 1);
+    await call('POST', `/tokens/${a.json.id}/revoke`, { body: {} });
+    expect((await withToken(a.json.token, 'GET', '/today')).status).toBe(401);
+    const b = await make('read', 1);
+    vi.setSystemTime(new Date('2026-11-05T05:00:01Z'));
+    expect((await withToken(b.json.token, 'GET', '/today')).status).toBe(401);
+    expect((await withToken('fdt_not-a-real-token', 'GET', '/today')).status).toBe(401);
+    expect((await call('GET', '/today', { headers: { Authorization: 'Basic abc' }, env: { DEV_AUTH_EMAIL: '' } })).status).toBe(401);
+    // 不再是最高管理者，token 也跟著失效
+    const c = await make('read', 30);
+    expect((await withToken(c.json.token, 'GET', '/today', undefined)).status).toBe(200);
+    const res = await app.request(
+      'http://localhost/api/today',
+      { headers: { Authorization: `Bearer ${c.json.token}` } },
+      env({ SUPER_ADMINS: 'someone-else@test.com', DEV_AUTH_EMAIL: '' }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('正式網域沒設 Access 也一律拒絕（fail closed）', async () => {
+    await seed();
+    const t = (await make('read')).json.token;
+    const res = await app.request('https://doctor.example.com/api/today', { headers: { Authorization: `Bearer ${t}` } }, env());
+    expect(res.status).toBe(500);
+  });
+
+  it('權限表：一層包一層', () => {
+    expect(tokenMayCall('read', 'GET', 'http://x/api/members/3')).toBe(true);
+    expect(tokenMayCall('read', 'POST', 'http://x/api/doses')).toBe(false);
+    expect(tokenMayCall('log', 'POST', 'http://x/api/doses')).toBe(true);
+    expect(tokenMayCall('log', 'PUT', 'http://x/api/medications/3')).toBe(false);
+    expect(tokenMayCall('write', 'PUT', 'http://x/api/medications/3')).toBe(true);
+    expect(tokenMayCall('write', 'PATCH', 'http://x/api/users/me')).toBe(false);
   });
 });
 

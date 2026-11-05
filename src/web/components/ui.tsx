@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import type { Member } from '../../shared/apiTypes';
+import { tokenActorName, type Member } from '../../shared/apiTypes';
 import type { Slot } from '../../shared/meds';
 import type { ApiRequestError } from '../api';
 
@@ -32,6 +32,18 @@ export function Alert({ kind = 'info', icon, children }: { kind?: 'info' | 'warn
       {icon ?? (kind === 'ok' ? <Icon.check /> : kind === 'info' ? <Icon.info /> : <Icon.alert />)}
       <div className="grow">{children}</div>
     </div>
+  );
+}
+
+/** 用 API token（Claude Code 等程式）建的紀錄：標出是哪一把 */
+export function ViaTag({ by }: { by: string | null | undefined }) {
+  const name = tokenActorName(by);
+  if (!name) return null;
+  return (
+    <span className="tag" title="用 API token 建的紀錄">
+      <Icon.key />
+      經 API：{name}
+    </span>
   );
 }
 
@@ -758,6 +770,18 @@ export const Icon = {
       <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
       <circle cx="9" cy="10" r="1.6" />
       <path d="M20.5 15.5l-4.5-4.5-8.5 8.5" />
+    </Svg>
+  ),
+  key: () => (
+    <Svg>
+      <circle cx="8" cy="15" r="4.5" />
+      <path d="M11.2 11.8L20 3M16.5 6.5l2.5 2.5M14 9l2 2" />
+    </Svg>
+  ),
+  copy: () => (
+    <Svg>
+      <rect x="8.5" y="8.5" width="12" height="12" rx="2.5" />
+      <path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5" />
     </Svg>
   ),
   chat: () => (

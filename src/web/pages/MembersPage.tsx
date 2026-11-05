@@ -6,7 +6,7 @@ import { addDays, taipeiToday } from '../../shared/dates';
 import { courseProgress, isActive, scheduleLabel } from '../../shared/meds';
 import { api } from '../api';
 import { MEASURE_ICON, MeasurePanel } from '../components/QuickAdd';
-import { Avatar, confirmDialog, Empty, ErrorBox, Icon, OtterFace, PageHead, PageSkeleton, Panel, promptDialog, toast } from '../components/ui';
+import { Avatar, confirmDialog, Empty, ErrorBox, Icon, OtterFace, PageHead, PageSkeleton, Panel, promptDialog, toast, ViaTag } from '../components/ui';
 import { dayLabel } from '../format';
 import { emitDataChanged, useAction, useApi, useQuick, useSession } from '../hooks';
 import { Timeline } from './TimelinePage';
@@ -453,6 +453,7 @@ export function MemberPage() {
                         {x.name}
                         {x.category && <span className="tag blue">{x.category}</span>}
                         {x.mustFinish && <span className="tag amber">要吃完</span>}
+                        <ViaTag by={x.createdBy} />
                       </div>
                       <div className="line num">
                         {[x.dose, scheduleLabel(x.slots, x.timing, x.asNeeded), p.totalDays ? `第 ${Math.min(p.dayNo, p.totalDays)}/${p.totalDays} 天` : x.asNeeded ? '' : '長期'].filter(Boolean).join('・')}

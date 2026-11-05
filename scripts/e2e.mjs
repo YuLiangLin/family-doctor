@@ -67,6 +67,14 @@ await api('POST', '/measurements', { memberId: dad, kind: 'temperature', value: 
 await api('POST', '/measurements', { memberId: dad, kind: 'temperature', value: 37.8, measuredAt: `${yesterday} 23:00` });
 await api('POST', '/measurements', { memberId: dad, kind: 'temperature', value: 37.4, measuredAt: `${today} 08:00` });
 await api('POST', '/measurements', { memberId: dad, kind: 'temperature', value: 37.6, measuredAt: `${today} 13:20` });
+// API token（給 Claude Code 等程式用）：用 token 記一筆，畫面上要標「經 API」
+const tok = await api('POST', '/tokens', { name: 'Claude Code', scope: 'log', days: 90 });
+const viaToken = await fetch(`${BASE}/api/notes`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok.token}` },
+  body: JSON.stringify({ memberId: kid, notedAt: `${today} 09:10`, body: '早上咳了幾聲，精神不錯', severity: 1 }),
+});
+if (viaToken.status !== 201) throw new Error(`用 token 記錄失敗：${viaToken.status} ${await viaToken.text()}`);
 // 對話：問一題，假裝 runner 回了（直接寫資料庫）
 const conv = await api('POST', '/chat/conversations', { memberId: dad });
 await api('POST', `/chat/conversations/${conv.id}/messages`, { body: '尿尿的時候會火熱，要緊嗎？' });
@@ -142,6 +150,16 @@ for (const scheme of ['light', 'dark']) {
     await voiceBtn.click(); // 關掉，免得下一頁也是語音模式
   }
   await shot('/settings', 'settings');
+  if (scheme === 'light') {
+    // 建一把 token：建立後只顯示一次
+    await page.getByRole('button', { name: '建立', exact: true }).click();
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${SHOTS}${scheme}-token-new.png` });
+    await page.getByRole('dialog').getByRole('button', { name: '建立', exact: true }).click();
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `${SHOTS}${scheme}-token-created.png` });
+    await page.getByRole('button', { name: '我存好了' }).click();
+  }
   await ctx.close();
 
   // 電腦（筆電 1440×900）

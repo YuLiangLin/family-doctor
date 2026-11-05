@@ -4458,3 +4458,86 @@ a.entry:hover {
     display: none !important;
   }
 }
+
+/* ======================================================================
+   API token（設定頁）
+   ====================================================================== */
+
+.token-box {
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  word-break: break-all;
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+.radio-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    background 140ms,
+    border-color 140ms;
+}
+
+.radio-card input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.radio-card .dot {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  flex: none;
+  transition:
+    border-color 140ms,
+    box-shadow 140ms;
+}
+
+.radio-card strong {
+  display: block;
+  font-size: 0.9375rem;
+}
+
+.radio-card small {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--text-3);
+  line-height: 1.5;
+  margin-top: 1px;
+}
+
+.radio-card:hover {
+  border-color: color-mix(in srgb, var(--text) 26%, transparent);
+}
+
+.radio-card:has(input:checked) {
+  border-color: color-mix(in srgb, var(--primary) 60%, transparent);
+  background: var(--primary-soft);
+}
+
+.radio-card:has(input:checked) .dot {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 4px var(--surface);
+  background: var(--primary);
+}
+
+.radio-card:has(input:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

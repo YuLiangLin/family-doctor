@@ -1,5 +1,6 @@
 // DB row → API 物件（欄位對應集中在這裡；加欄位時這裡、apiTypes.ts、migration 一起改）
 import type {
+  ApiToken,
   Attachment,
   AttachmentKind,
   ChatAction,
@@ -11,6 +12,7 @@ import type {
   Medication,
   Member,
   Mood,
+  TokenScope,
   Visit,
 } from '../shared/apiTypes';
 import { parseSlots, type Timing } from '../shared/meds';
@@ -246,4 +248,26 @@ export const toChatMessage = (r: ChatMessageRow): ChatMessage => ({
   actions: parseJson<ChatAction[]>(r.actions, []),
   mood: r.mood,
   createdAt: r.created_at,
+});
+
+export interface ApiTokenRow {
+  id: number;
+  name: string;
+  hint: string;
+  scope: TokenScope;
+  created_at: string;
+  expires_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+export const toApiToken = (r: ApiTokenRow): ApiToken => ({
+  id: r.id,
+  name: r.name,
+  hint: r.hint,
+  scope: r.scope,
+  createdAt: r.created_at,
+  expiresAt: r.expires_at,
+  lastUsedAt: r.last_used_at,
+  revokedAt: r.revoked_at,
 });

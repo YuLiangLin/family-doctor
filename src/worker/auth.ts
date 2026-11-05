@@ -1,17 +1,18 @@
 // 登入（同二胎）：Google 帳號經 Cloudflare Access 登入，驗過是誰之後系統在那台裝置發自己的登入憑證（sessions.ts，一年、每天用就延長）。
 // 之後有 Access 憑證就驗它，沒有就看系統的憑證，再用 users 表決定能不能進（不在名單、停用一律擋）。
 // 家裡的 dr-claude-runner 用 Access 服務憑證，只能走 /api/agent 的 AGENT_ROUTES。
+// API token（Authorization: Bearer fdt_…，最高管理者在設定頁建的，給 Claude Code 等程式用）只能走 TOKEN_ROUTES，依權限再縮小。
 // 設定不齊全一律拒絕（fail closed）；只有 localhost + DEV_AUTH_EMAIL 才略過登入。
 import type { Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { getCookie } from 'hono/cookie';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
-import { AGENT_PREFIX, ATTACHMENT_TYPES, type Role } from '../shared/apiTypes';
+import { AGENT_PREFIX, API_TOKEN_PREFIX, ATTACHMENT_TYPES, TOKEN_SCOPE_LABEL, tokenActor, type Role, type TokenScope } from '../shared/apiTypes';
 import { taipeiNow } from '../shared/dates';
 import { first, run } from './db';
 import type { AppEnv, CurrentUser, Env } from './env';
 import { ApiFailure, fail } from './http';
-import { createSession, sessionEmail } from './sessions';
+import { createSession, sessionEmail, sha256Hex } from './sessions';
 
 const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 const SEEN_WRITE_MS = 5 * 60_000;
@@ -157,6 +158,83 @@ export function agentMayCall(method: string, url: string): boolean {
 
 export const isAgentPath = (url: string) => /^\/api\/agent(\/|$)/.test(new URL(url).pathname);
 
+/**
+ * API token 能呼叫的 API（其他一律 403），依權限一層包一層：
+ * - read 唯讀：今天、時間軸、家人、看診、用藥、附件
+ * - log 再加：記身體狀況、量測、打勾（含作廢、取消打勾）
+ * - write 再加：家人、看診、用藥（直接生效，created_by 記成 token:<id>:<名稱>，畫面標「經 API」）、上傳附件
+ * 都不能：管帳號（/users）、建 token（/tokens）、通知裝置（/push）、Dr.Claude 對話與讀藥袋（/chat、/scan）、移除家人、/api/agent。
+ */
+const TOKEN_ROUTES: Record<TokenScope, { method: string; path: RegExp }[]> = {
+  read: [
+    { method: 'GET', path: /^\/api\/me$/ },
+    { method: 'GET', path: /^\/api\/(today|timeline)$/ },
+    { method: 'GET', path: /^\/api\/members(\/\d+)?$/ },
+    { method: 'GET', path: /^\/api\/visits(\/\d+)?$/ },
+    { method: 'GET', path: /^\/api\/medications\/\d+$/ },
+    { method: 'GET', path: /^\/api\/attachments\/\d+(\/file)?$/ },
+  ],
+  log: [
+    { method: 'POST', path: /^\/api\/(notes|measurements)$/ },
+    { method: 'POST', path: /^\/api\/(notes|measurements)\/\d+\/void$/ },
+    { method: 'POST', path: /^\/api\/doses(\/clear)?$/ },
+    { method: 'POST', path: /^\/api\/doses\/\d+\/delete$/ },
+  ],
+  write: [
+    { method: 'POST', path: /^\/api\/members$/ },
+    { method: 'PUT', path: /^\/api\/members\/\d+$/ },
+    { method: 'POST', path: /^\/api\/visits$/ },
+    { method: 'PUT', path: /^\/api\/visits\/\d+$/ },
+    { method: 'POST', path: /^\/api\/visits\/\d+\/void$/ },
+    { method: 'POST', path: /^\/api\/medications$/ },
+    { method: 'PUT', path: /^\/api\/medications\/\d+$/ },
+    { method: 'POST', path: /^\/api\/medications\/\d+\/(stop|resume|void)$/ },
+    { method: 'POST', path: /^\/api\/attachments$/ },
+  ],
+};
+const SCOPE_LAYERS: Record<TokenScope, TokenScope[]> = { read: ['read'], log: ['read', 'log'], write: ['read', 'log', 'write'] };
+
+export function tokenMayCall(scope: TokenScope, method: string, url: string): boolean {
+  const path = new URL(url).pathname.replace(/\/+$/, '');
+  return SCOPE_LAYERS[scope].some((layer) => TOKEN_ROUTES[layer].some((r) => r.method === method && r.path.test(path)));
+}
+
+/** Authorization 標頭；沒帶是 null（帶了但格式不對是空字串，一律當成無效） */
+function bearerToken(c: Context<AppEnv>): string | null {
+  const h = c.req.header('Authorization');
+  if (h === undefined) return null;
+  const m = /^Bearer\s+(\S+)$/i.exec(h.trim());
+  return m ? m[1] : '';
+}
+
+/** API token → 使用者；無效、過期、撤銷、帳號停用、不再是最高管理者 → null */
+async function loadTokenUser(env: Env, raw: string): Promise<CurrentUser | null> {
+  if (!raw.startsWith(API_TOKEN_PREFIX) || raw.length > 100) return null;
+  const nowDate = new Date();
+  const row = await first<{ id: number; name: string; scope: TokenScope; user_email: string; last_used_at: string | null; role: Role; member_id: number | null }>(
+    env.DB,
+    `SELECT t.id, t.name, t.scope, t.user_email, t.last_used_at, u.role, u.member_id
+       FROM api_tokens t JOIN users u ON u.email = t.user_email
+      WHERE t.token_hash = ? AND t.revoked_at IS NULL AND t.expires_at > ? AND u.active = 1`,
+    await sha256Hex(raw),
+    taipeiNow(nowDate),
+  );
+  if (!row || !isSuperAdmin(env, row.user_email, row.role)) return null;
+  if ((row.last_used_at ?? '') < taipeiNow(new Date(nowDate.getTime() - SEEN_WRITE_MS))) {
+    await run(env.DB, 'UPDATE api_tokens SET last_used_at = ? WHERE id = ?', taipeiNow(nowDate), row.id);
+  }
+  return {
+    email: tokenActor(row.id, row.name),
+    name: `${row.name}（API token）`,
+    role: row.role,
+    picture: '',
+    memberId: row.member_id,
+    agent: false,
+    superAdmin: false,
+    token: { id: row.id, name: row.name, scope: row.scope, ownerEmail: row.user_email },
+  };
+}
+
 function requireAccessConfig(env: Env): { ACCESS_TEAM_DOMAIN: string; ACCESS_AUD: string } {
   const { ACCESS_TEAM_DOMAIN, ACCESS_AUD } = env;
   if (!ACCESS_TEAM_DOMAIN || !ACCESS_AUD) {
@@ -207,6 +285,19 @@ export function safeNext(raw: string | undefined): string {
 }
 
 export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
+  const bearer = bearerToken(c);
+  if (bearer !== null) {
+    if (!isLocalRequest(c.req.url)) requireAccessConfig(c.env);
+    if (isAgentPath(c.req.url)) return c.json({ error: '這個網址只給 Dr.Claude 服務用' }, 403);
+    const user = bearer ? await loadTokenUser(c.env, bearer) : null;
+    if (!user?.token) return c.json({ error: 'API token 無效、過期或已撤銷' }, 401);
+    if (!tokenMayCall(user.token.scope, c.req.method, c.req.url)) {
+      return c.json({ error: `這把 API token（${TOKEN_SCOPE_LABEL[user.token.scope]}）不能用這個功能` }, 403);
+    }
+    c.set('user', user);
+    await next();
+    return;
+  }
   const identity = await identify(c);
   const agentPath = isAgentPath(c.req.url);
   if (identity.clientId) {

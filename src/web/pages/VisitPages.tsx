@@ -4,7 +4,7 @@ import type { AiJob, Attachment, MedicationDraft, RunnerState, VisitDetail, Visi
 import { taipeiToday } from '../../shared/dates';
 import { scheduleLabel, SLOT_INFO, SLOTS, TIMING_LABEL, type Slot, type Timing } from '../../shared/meds';
 import { api } from '../api';
-import { Alert, AttachmentImage, Empty, ErrorBox, Icon, MemberPicker, OtterFace, PageHead, PageSkeleton, promptDialog, toast, Who } from '../components/ui';
+import { Alert, AttachmentImage, Empty, ErrorBox, Icon, MemberPicker, OtterFace, PageHead, PageSkeleton, promptDialog, toast, ViaTag, Who } from '../components/ui';
 import { dayLabel } from '../format';
 import { emitDataChanged, useAction, useApi, useSession } from '../hooks';
 import { uploadPhoto } from '../imageTools';
@@ -118,6 +118,7 @@ export function VisitPage() {
                 </span>
               )}
               {d.copay !== null && <span className="tag num">自付 {d.copay} 元</span>}
+              <ViaTag by={d.createdBy} />
             </div>
           </section>
 
@@ -149,6 +150,7 @@ export function VisitPage() {
                       {m.name}
                       {m.category && <span className="tag blue">{m.category}</span>}
                       {m.mustFinish && <span className="tag amber">要吃完</span>}
+                      {m.createdBy !== d.createdBy && <ViaTag by={m.createdBy} />}
                     </div>
                     {m.genericName && <div className="tiny muted">{m.genericName}</div>}
                     <div className="line num">

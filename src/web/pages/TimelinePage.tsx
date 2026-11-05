@@ -4,7 +4,7 @@ import { MEASUREMENT_INFO, type Measurement, type TimelineItem } from '../../sha
 import { taipeiToday } from '../../shared/dates';
 import { api } from '../api';
 import { MEASURE_ICON } from '../components/QuickAdd';
-import { Avatar, confirmDialog, Empty, ErrorBox, Icon, MemberPicker, PageHead, toast } from '../components/ui';
+import { Avatar, confirmDialog, Empty, ErrorBox, Icon, MemberPicker, PageHead, toast, ViaTag } from '../components/ui';
 import { dayLabel, hhmm, weekday } from '../format';
 import { emitDataChanged, useApi, useQuick, useSession } from '../hooks';
 
@@ -96,11 +96,14 @@ export function Timeline({ items, showWho = true, empty }: { items: TimelineItem
                         {v.department && <span className="muted" style={{ fontWeight: 500 }}>・{v.department}</span>}
                       </span>
                       {(v.reason || v.diagnosis) && <span className="soft small">{[v.reason, v.diagnosis].filter(Boolean).join('；')}</span>}
-                      {it.medCount > 0 && (
+                      {(it.medCount > 0 || v.createdBy.startsWith('token:')) && (
                         <span className="entry-foot">
-                          <span className="tag blue">
-                            <Icon.pill />開了 {it.medCount} 種藥
-                          </span>
+                          {it.medCount > 0 && (
+                            <span className="tag blue">
+                              <Icon.pill />開了 {it.medCount} 種藥
+                            </span>
+                          )}
+                          <ViaTag by={v.createdBy} />
                         </span>
                       )}
                     </span>
@@ -125,10 +128,11 @@ export function Timeline({ items, showWho = true, empty }: { items: TimelineItem
                         <time>{hhmm(n.notedAt)}</time>
                       </span>
                       <span className="entry-body">{n.body}</span>
-                      {(n.severity > 0 || n.source === 'dr_claude') && (
+                      {(n.severity > 0 || n.source === 'dr_claude' || n.createdBy.startsWith('token:')) && (
                         <span className="entry-foot">
                           {n.severity > 0 && <span className={`tag ${SEVERITY_TAG[n.severity]}`}>{SEVERITY_LABEL[n.severity]}</span>}
                           {n.source === 'dr_claude' && <span className="tag otter">Dr.Claude 記的</span>}
+                          <ViaTag by={n.createdBy} />
                         </span>
                       )}
                     </span>
@@ -163,10 +167,11 @@ export function Timeline({ items, showWho = true, empty }: { items: TimelineItem
                         </span>
                       )}
                     </span>
-                    {(m.note || m.source === 'dr_claude') && (
+                    {(m.note || m.source === 'dr_claude' || m.createdBy.startsWith('token:')) && (
                       <span className="entry-foot">
                         {m.note && <span className="small muted">{m.note}</span>}
                         {m.source === 'dr_claude' && <span className="tag otter">Dr.Claude 記的</span>}
+                        <ViaTag by={m.createdBy} />
                       </span>
                     )}
                   </span>
