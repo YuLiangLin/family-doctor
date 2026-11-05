@@ -28,10 +28,20 @@ function isLocalRequest(url: string): boolean {
 }
 
 export interface Identity {
+  /** 本人的信箱（users.email）；用別的登入信箱登入時已經換成本人 */
   email: string;
   picture: string;
   /** 服務憑證的 Client ID；人登入時是空字串 */
   clientId: string;
+  /** 這次用哪個 Google 帳號登入（跟 email 不一樣＝用別的登入信箱） */
+  loginEmail?: string;
+}
+
+/** 登入信箱 → 本人的信箱：users 裡有就是本人；user_emails 裡有就換成它綁的人；都沒有就原樣（之後在名單檢查擋掉） */
+export async function primaryEmail(db: D1Database, email: string): Promise<string> {
+  if (await first(db, 'SELECT 1 FROM users WHERE email = ?', email)) return email;
+  const alias = await first<{ user_email: string }>(db, 'SELECT user_email FROM user_emails WHERE email = ?', email);
+  return alias?.user_email ?? email;
 }
 
 /** 只接受 Google 的頭像網址 */
@@ -86,7 +96,10 @@ export function isSuperAdmin(env: Env, email: string, role: Role): boolean {
   return role === 'admin' && emailList(env.SUPER_ADMINS).includes(email);
 }
 
-async function loadUser(env: Env, { email, picture }: Identity): Promise<CurrentUser | null> {
+async function loadUser(env: Env, identity: Identity): Promise<CurrentUser | null> {
+  const { email } = identity;
+  // 用別的登入信箱（例：公司帳號）登入時，不拿那個帳號的大頭照蓋掉本人的
+  const picture = identity.loginEmail && identity.loginEmail !== email ? '' : identity.picture;
   const row = await first<{ email: string; name: string; role: Role; active: number; picture_url: string; last_seen_at: string; member_id: number | null }>(
     env.DB,
     'SELECT email, name, role, active, picture_url, last_seen_at, member_id FROM users WHERE email = ?',
@@ -133,12 +146,12 @@ async function loadUser(env: Env, { email, picture }: Identity): Promise<Current
   return null;
 }
 
-/** AGENT_CLIENT_IDS 白名單裡的服務憑證 → Dr.Claude runner */
+/** AGENT_CLIENT_IDS 白名單裡的服務憑證 → Dr.水獺 runner */
 export function loadAgent(env: Env, clientId: string): CurrentUser | null {
   for (const item of (env.AGENT_CLIENT_IDS ?? '').split(',')) {
     const [id, ...rest] = item.split('=');
     if (!id.trim() || id.trim() !== clientId) continue;
-    const name = rest.join('=').trim().slice(0, 30) || 'Dr.Claude';
+    const name = rest.join('=').trim().slice(0, 30) || 'Dr.水獺';
     return { email: `${AGENT_PREFIX}${name}`, name, role: 'member', picture: '', memberId: null, agent: true, superAdmin: false };
   }
   return null;
@@ -171,7 +184,7 @@ export const isAgentPath = (url: string) => /^\/api\/agent(\/|$)/.test(new URL(u
  * - read 唯讀：今天、時間軸、家人、看診、用藥、附件、藥品資料與照片
  * - log 再加：記身體狀況、量測、打勾（含作廢、取消打勾）
  * - write 再加：家人、看診、用藥（直接生效，created_by 記成 token:<id>:<名稱>，畫面標「經 API」）、用藥對照片、上傳附件
- * 都不能：管帳號（/users）、建 token（/tokens）、通知裝置（/push）、Dr.Claude 對話與讀藥袋（/chat、/scan）、移除家人、/api/agent。
+ * 都不能：管帳號（/users）、建 token（/tokens）、通知裝置（/push）、Dr.水獺 對話與讀藥袋（/chat、/scan）、移除家人、/api/agent。
  */
 const TOKEN_ROUTES: Record<TokenScope, { method: string; path: RegExp }[]> = {
   read: [
@@ -259,7 +272,8 @@ export async function identify(c: Context<AppEnv>): Promise<Identity> {
     const dev = env.DEV_AUTH_EMAIL.trim();
     // 本機測試 runner：DEV_AUTH_EMAIL=agent:<Client ID>
     if (dev.startsWith(AGENT_PREFIX)) return { email: '', picture: '', clientId: dev.slice(AGENT_PREFIX.length) };
-    return { email: dev.toLowerCase(), picture: '', clientId: '' };
+    const login = dev.toLowerCase();
+    return { email: await primaryEmail(env.DB, login), picture: '', clientId: '', loginEmail: login };
   }
   const { ACCESS_TEAM_DOMAIN, ACCESS_AUD } = requireAccessConfig(env);
   const token = c.req.header('Cf-Access-Jwt-Assertion') ?? getCookie(c, 'CF_Authorization');
@@ -267,8 +281,10 @@ export async function identify(c: Context<AppEnv>): Promise<Identity> {
   if (token) {
     try {
       const id = await verifyAccess({ ...env, ACCESS_TEAM_DOMAIN, ACCESS_AUD }, token);
-      if (id.email && (await sessionEmail(c)) !== id.email) await createSession(c, id.email);
-      return id;
+      if (!id.email) return id;
+      const email = await primaryEmail(env.DB, id.email);
+      if ((await sessionEmail(c)) !== email) await createSession(c, email, email === id.email ? '' : id.email);
+      return { ...id, email, loginEmail: id.email };
     } catch (e) {
       if (!(e instanceof ApiFailure)) throw e;
       accessError = e;
@@ -298,7 +314,7 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const bearer = bearerToken(c);
   if (bearer !== null) {
     if (!isLocalRequest(c.req.url)) requireAccessConfig(c.env);
-    if (isAgentPath(c.req.url)) return c.json({ error: '這個網址只給 Dr.Claude 服務用' }, 403);
+    if (isAgentPath(c.req.url)) return c.json({ error: '這個網址只給 Dr.水獺 服務用' }, 403);
     const user = bearer ? await loadTokenUser(c.env, bearer) : null;
     if (!user?.token) return c.json({ error: 'API token 無效、過期或已撤銷' }, 401);
     if (!tokenMayCall(user.token.scope, c.req.method, c.req.url)) {
@@ -313,14 +329,14 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   if (identity.clientId) {
     const agent = loadAgent(c.env, identity.clientId);
     if (!agent) return c.json({ error: `服務憑證 ${identity.clientId} 沒有開通（AGENT_CLIENT_IDS）` }, 403);
-    if (!agentPath || !agentMayCall(c.req.method, c.req.url)) return c.json({ error: 'Dr.Claude 服務只能使用 /api/agent' }, 403);
+    if (!agentPath || !agentMayCall(c.req.method, c.req.url)) return c.json({ error: 'Dr.水獺 服務只能使用 /api/agent' }, 403);
     c.set('user', agent);
     await next();
     return;
   }
-  if (agentPath) return c.json({ error: '這個網址只給 Dr.Claude 服務用' }, 403);
+  if (agentPath) return c.json({ error: '這個網址只給 Dr.水獺 服務用' }, 403);
   const user = await loadUser(c.env, identity);
-  if (!user) return c.json({ error: `帳號 ${identity.email} 還沒開通，請請家裡的管理者把你加進來` }, 403);
+  if (!user) return c.json({ error: `帳號 ${identity.loginEmail ?? identity.email} 還沒開通，請請家裡的管理者把你加進來` }, 403);
   c.set('user', user);
   await next();
 });

@@ -167,7 +167,7 @@ for (const scheme of ['light', 'dark']) {
     }
   }
   // 站內換頁（不重新載入）：換頁時 effect 的 cleanup 出錯會整頁變白，下面的整頁載入測不到
-  for (const name of ['紀錄', 'Dr.Claude', '家人', '今天']) {
+  for (const name of ['紀錄', 'Dr.水獺', '家人', '今天']) {
     await page.getByRole('link', { name, exact: true }).click();
     await page.waitForTimeout(300);
   }
@@ -223,16 +223,15 @@ for (const scheme of ['light', 'dark']) {
     await page.waitForTimeout(600);
     await page.screenshot({ path: `${SHOTS}${scheme}-token-created.png` });
     await page.getByRole('button', { name: '我存好了' }).click();
-    // 從舊網址轉過來（?moved=1）：提醒搬家、按「知道了」之後不再出現（src/web/moved.ts）
-    await page.goto(`${BASE}/?moved=1`, { waitUntil: 'networkidle' });
-    const notice = page.getByText('家庭醫生搬到新網址了');
-    await notice.waitFor();
-    if (page.url().includes('moved=')) throw new Error('moved 參數沒有從網址拿掉');
-    await page.screenshot({ path: `${SHOTS}${scheme}-moved.png` });
-    await page.getByRole('button', { name: '知道了' }).click();
-    await page.reload({ waitUntil: 'networkidle' });
-    if (await notice.count()) throw new Error('按了知道了，搬家提醒還在');
-    console.log('✓', scheme, 'moved');
+    // 其他登入信箱（例：公司的 Google 帳號）
+    await page.getByRole('button', { name: '其他登入信箱' }).first().click();
+    await page.getByRole('alertdialog').getByRole('textbox').fill('dad.work@example.com');
+    await page.getByRole('alertdialog').getByRole('button', { name: '加入', exact: true }).click();
+    await page.getByText('dad.work@example.com', { exact: true }).waitFor();
+    await page.getByText('dad.work@example.com', { exact: true }).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${SHOTS}${scheme}-login-emails.png` });
+    console.log('✓', scheme, 'login-emails');
   }
   await ctx.close();
 

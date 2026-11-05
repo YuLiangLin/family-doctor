@@ -10,7 +10,7 @@ import { emitDataChanged, useAction, useApi, useSession } from '../hooks';
 import { uploadPhoto } from '../imageTools';
 import { DrugSuggest, MedPhotoSlot } from '../components/DrugPhoto';
 
-/** 從 Dr.Claude 對話帶過來的草稿 */
+/** 從 Dr.水獺 對話帶過來的草稿 */
 export interface DraftState {
   draft: VisitDraft;
   memberId: number;
@@ -330,12 +330,12 @@ export function VisitEditPage() {
     >
       {fromChat && (
         <Alert kind="info" icon={<Icon.sparkle />}>
-          這是 Dr.Claude 整理的草稿，請核對藥名、時段和天數再儲存。
+          這是 Dr.水獺 整理的草稿，請核對藥名、時段和天數再儲存。
         </Alert>
       )}
       {v.uncertain.length > 0 && (
         <Alert kind="warn">
-          <strong>Dr.Claude 不太確定的地方</strong>
+          <strong>Dr.水獺 不太確定的地方</strong>
           <ul>
             {v.uncertain.map((u) => (
               <li key={u}>{u}</li>
@@ -395,7 +395,7 @@ export function VisitEditPage() {
         <section className="stack sm">
           <div className="section-title" style={{ marginBottom: 0 }}>
             <h2>開的藥</h2>
-            <span className="aside">{v.medications.length ? `${v.medications.length} 種` : '拍藥袋讓 Dr.Claude 讀，或自己加'}</span>
+            <span className="aside">{v.medications.length ? `${v.medications.length} 種` : '拍藥袋讓 Dr.水獺 讀，或自己加'}</span>
           </div>
           {v.medications.map((m, i) => (
             <MedEditor
@@ -429,7 +429,7 @@ export function VisitEditPage() {
         <Icon.chevronLeft />
         返回
       </button>
-      <PageHead title={editId ? '編輯看診' : '記看診'} sub={editId ? undefined : '拍藥袋讓 Dr.Claude 幫你填，再核對一次就好'} />
+      <PageHead title={editId ? '編輯看診' : '記看診'} sub={editId ? undefined : '拍藥袋讓 Dr.水獺 幫你填，再核對一次就好'} />
       {editId ? (
         <div style={{ maxWidth: 760 }}>{existing.data ? form : <PageSkeleton />}</div>
       ) : (
@@ -562,7 +562,7 @@ function MedEditor({ index, med, onChange, onRemove }: { index: number; med: Med
   );
 }
 
-/** 拍藥袋：上傳 → 排一件讀藥袋給家裡的 Dr.Claude → 等草稿回來填進表單 */
+/** 拍藥袋：上傳 → 排一件讀藥袋給家裡的 Dr.水獺 → 等草稿回來填進表單 */
 function Scanner({
   memberId,
   photos,
@@ -588,7 +588,7 @@ function Scanner({
         setRunner(r.runner);
         if (r.job.status === 'done' && r.job.result) {
           onDraft(r.job.result);
-          toast('Dr.Claude 讀好了，請核對');
+          toast('Dr.水獺 讀好了，請核對');
         }
       } catch {
         // 下次再試
@@ -603,7 +603,7 @@ function Scanner({
     <section className="card pad scanner stack">
       <div className="spread">
         <h2>拍藥袋</h2>
-        <span className="tag otter">Dr.Claude 幫你填</span>
+        <span className="tag otter">Dr.水獺 幫你填</span>
       </div>
       <input
         ref={input}
@@ -628,7 +628,7 @@ function Scanner({
             <Icon.camera />
           </span>
           <strong>{act.busy ? '上傳中…' : '拍藥袋、收據'}</strong>
-          <span>可以拍好幾張。Dr.Claude 會讀出藥名、吃法、天數和回診日。</span>
+          <span>可以拍好幾張。Dr.水獺 會讀出藥名、吃法、天數和回診日。</span>
         </button>
       ) : (
         <>
@@ -655,7 +655,7 @@ function Scanner({
               }}
             >
               <Icon.sparkle />
-              {job?.status === 'done' ? '再讀一次' : '請 Dr.Claude 讀'}
+              {job?.status === 'done' ? '再讀一次' : '請 Dr.水獺 讀'}
             </button>
           </div>
         </>
@@ -667,7 +667,7 @@ function Scanner({
           </span>
           <div className="grow">
             <strong className="hand" style={{ fontSize: '1.0625rem' }}>
-              {job!.status === 'queued' ? 'Dr.Claude 走過來了…' : '讀藥袋中，大約 20～60 秒'}
+              {job!.status === 'queued' ? 'Dr.水獺 走過來了…' : '讀藥袋中，大約 20～60 秒'}
             </strong>
             <div className="indeterminate" />
           </div>

@@ -131,7 +131,7 @@ export function Timeline({ items, showWho = true, empty }: { items: TimelineItem
                       {(n.severity > 0 || n.source === 'dr_claude' || n.createdBy.startsWith('token:')) && (
                         <span className="entry-foot">
                           {n.severity > 0 && <span className={`tag ${SEVERITY_TAG[n.severity]}`}>{SEVERITY_LABEL[n.severity]}</span>}
-                          {n.source === 'dr_claude' && <span className="tag otter">Dr.Claude 記的</span>}
+                          {n.source === 'dr_claude' && <span className="tag otter">Dr.水獺 記的</span>}
                           <ViaTag by={n.createdBy} />
                         </span>
                       )}
@@ -170,7 +170,7 @@ export function Timeline({ items, showWho = true, empty }: { items: TimelineItem
                     {(m.note || m.source === 'dr_claude' || m.createdBy.startsWith('token:')) && (
                       <span className="entry-foot">
                         {m.note && <span className="small muted">{m.note}</span>}
-                        {m.source === 'dr_claude' && <span className="tag otter">Dr.Claude 記的</span>}
+                        {m.source === 'dr_claude' && <span className="tag otter">Dr.水獺 記的</span>}
                         <ViaTag by={m.createdBy} />
                       </span>
                     )}

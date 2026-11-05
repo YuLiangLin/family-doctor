@@ -29,7 +29,7 @@ function useDefaultMember(initial?: number | null) {
   return useState<number | null>(initial ?? me.memberId ?? members[0]?.id ?? null);
 }
 
-/** 「新增」：拍藥袋、記身體狀況、量體溫、其他量測、問 Dr.Claude */
+/** 「新增」：拍藥袋、記身體狀況、量體溫、其他量測、問 Dr.水獺 */
 export function AddMenu({ onClose, onPick, memberId }: { onClose: () => void; onPick: (k: QuickKind) => void; memberId?: number | null }) {
   const nav = useNavigate();
   const go = (to: string) => {
@@ -45,7 +45,7 @@ export function AddMenu({ onClose, onPick, memberId }: { onClose: () => void; on
           </span>
           <span className="txt">
             <strong>看完醫生：拍藥袋</strong>
-            <small>Dr.Claude 讀藥袋，幫你排好吃藥時間</small>
+            <small>Dr.水獺 讀藥袋，幫你排好吃藥時間</small>
           </span>
         </button>
         <button type="button" className="add-tile" style={tint('var(--amber-soft)', 'var(--amber)')} onClick={() => onPick('note')}>
@@ -81,7 +81,7 @@ export function AddMenu({ onClose, onPick, memberId }: { onClose: () => void; on
           </span>
           <span className="txt">
             <strong>用說的</strong>
-            <small>跟 Dr.Claude 說，他幫你記</small>
+            <small>跟 Dr.水獺 說，他幫你記</small>
           </span>
         </button>
       </div>

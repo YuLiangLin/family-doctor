@@ -63,6 +63,8 @@ export interface UserRow {
   picture: string;
   lastSeenAt: string;
   superAdmin: boolean;
+  /** 其他登入信箱（例：公司的 Google 帳號），登入後都算這個人 */
+  emails: string[];
 }
 
 export interface Member {
@@ -239,11 +241,11 @@ export type TimelineItem =
   | { type: 'note'; at: string; memberId: number; note: HealthNote }
   | { type: 'measurement'; at: string; memberId: number; measurement: Measurement };
 
-// ---- Dr.Claude ----
+// ---- Dr.水獺 ----
 
 export type Mood = 'calm' | 'happy' | 'concerned' | 'urgent';
 
-/** Dr.Claude 這次幫忙做的事（顯示在訊息下方） */
+/** Dr.水獺 這次幫忙做的事（顯示在訊息下方） */
 export type ChatAction =
   | { type: 'note'; id: number; memberId: number; summary: string }
   | { type: 'measurement'; id: number; memberId: number; summary: string }

@@ -73,7 +73,7 @@ export function TodayPage() {
         <span className="ic" style={{ background: 'var(--otter)' }}>
           <OtterFace size={28} />
         </span>
-        Dr.Claude
+        Dr.水獺
       </button>
     </div>
   );
@@ -103,7 +103,7 @@ export function TodayPage() {
                   <OtterFace size={56} />
                 </div>
                 <h3>今天沒有要吃的藥</h3>
-                <p>看完醫生拍一下藥袋，Dr.Claude 會幫你排好每天吃藥的時間，時間到了提醒你。</p>
+                <p>看完醫生拍一下藥袋，Dr.水獺 會幫你排好每天吃藥的時間，時間到了提醒你。</p>
                 <Link className="btn" to="/visits/new" style={{ marginTop: 6 }}>
                   <Icon.camera />
                   拍藥袋

@@ -1,6 +1,6 @@
 // 家裡的 dr-claude-runner 專用（/api/agent，Cloudflare Access 服務憑證；auth.ts 的 AGENT_ROUTES）。
 // runner 只能：領工作、讀工作內容與附件、查紀錄、回報進度、完成、失敗；另外幫忙處理藥品照片（runner 程式做，不經過 AI）。
-// 寫入紀錄只能經「完成」帶的 actions：日記、量測直接存（標 Dr.Claude 記的），看診＋用藥只會是草稿，要人在畫面按確認才存。
+// 寫入紀錄只能經「完成」帶的 actions：日記、量測直接存（標 Dr.水獺 記的），看診＋用藥只會是草稿，要人在畫面按確認才存。
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { MEASUREMENT_INFO, type AgentJobContext, type ChatAction, type MeasurementKind, type Medication, type VisitDraft } from '../../shared/apiTypes';
@@ -42,7 +42,7 @@ function decodeJpeg(b64: string, max: number): Uint8Array {
   return bytes;
 }
 
-/** 給 Dr.Claude 看的對話最多幾則 */
+/** 給 Dr.水獺 看的對話最多幾則 */
 const MAX_HISTORY = 30;
 
 /** 年齡（小朋友到月） */
@@ -73,7 +73,7 @@ async function failStale(db: D1Database) {
   const cutoff = taipeiNow(new Date(Date.now() - RUNNING_STALE_MINUTES * 60_000));
   await run(
     db,
-    `UPDATE ai_jobs SET status = 'failed', error = 'Dr.Claude 處理到一半中斷了（家裡的主機可能重開或斷線），請按「再試一次」', finished_at = ?, updated_at = ?
+    `UPDATE ai_jobs SET status = 'failed', error = 'Dr.水獺 處理到一半中斷了（家裡的主機可能重開或斷線），請按「再試一次」', finished_at = ?, updated_at = ?
      WHERE status = 'running' AND updated_at < ?`,
     taipeiNow(),
     taipeiNow(),
@@ -312,7 +312,7 @@ export const agentRoutes = new Hono<AppEnv>()
     if (!row) fail(404, '檔案已刪除');
     return serveAttachment(c.env, row!);
   })
-  // 查更早的紀錄（Dr.Claude 的工具 search_records 用）：?memberId=&from=&to=
+  // 查更早的紀錄（Dr.水獺 的工具 search_records 用）：?memberId=&from=&to=
   .get('/records', async (c) => {
     const memberId = c.req.query('memberId') ? parseId(c.req.query('memberId')) : undefined;
     const from = c.req.query('from') ?? addDays(taipeiToday(), -365);
@@ -425,7 +425,7 @@ export const agentRoutes = new Hono<AppEnv>()
         c.env,
         [job.created_by],
         {
-          title: b.mood === 'urgent' ? '⚠️ Dr.Claude：建議盡快就醫' : '🦦 Dr.Claude 回覆了',
+          title: b.mood === 'urgent' ? '⚠️ Dr.水獺：建議盡快就醫' : '🦦 Dr.水獺 回覆了',
           body: b.reply.replace(/[#*_`>]/g, '').replace(/\s+/g, ' ').slice(0, 120),
           url: `/doctor/${job.conversation_id}`,
           tag: `chat-${job.conversation_id}`,
