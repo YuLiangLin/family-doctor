@@ -8,6 +8,7 @@ import { Alert, AttachmentImage, Empty, ErrorBox, Icon, MemberPicker, OtterFace,
 import { dayLabel } from '../format';
 import { emitDataChanged, useAction, useApi, useSession } from '../hooks';
 import { uploadPhoto } from '../imageTools';
+import { DrugSuggest, MedPhotoSlot } from '../components/DrugPhoto';
 
 /** 從 Dr.Claude 對話帶過來的草稿 */
 export interface DraftState {
@@ -145,31 +146,34 @@ export function VisitPage() {
             ) : (
               <div style={{ paddingBottom: 4 }}>
                 {d.medications.map((m) => (
-                  <div key={m.id} className={`med${m.stoppedAt ? ' stopped' : ''}`}>
-                    <div className="name">
-                      {m.name}
-                      {m.category && <span className="tag blue">{m.category}</span>}
-                      {m.mustFinish && <span className="tag amber">要吃完</span>}
-                      {m.createdBy !== d.createdBy && <ViaTag by={m.createdBy} />}
-                    </div>
-                    {m.genericName && <div className="tiny muted">{m.genericName}</div>}
-                    <div className="line num">
-                      <BagRead slots={m.slots} asNeeded={m.asNeeded} />
-                      {[TIMING_LABEL[m.timing], m.dose, m.days ? `${m.days} 天` : '長期'].filter(Boolean).join('・')}
-                    </div>
-                    {m.purpose && <div className="small soft">{m.purpose}</div>}
-                    {m.appearance && <div className="tiny muted">外觀：{m.appearance}</div>}
-                    {m.cautions && (
-                      <div className="caution">
-                        <Icon.alert />
-                        {m.cautions}
+                  <div key={m.id} className={`med med-with-photo${m.stoppedAt ? ' stopped' : ''}`}>
+                    <MedPhotoSlot med={m} />
+                    <div className="grow">
+                      <div className="name">
+                        {m.name}
+                        {m.category && <span className="tag blue">{m.category}</span>}
+                        {m.mustFinish && <span className="tag amber">要吃完</span>}
+                        {m.createdBy !== d.createdBy && <ViaTag by={m.createdBy} />}
                       </div>
-                    )}
-                    {m.stoppedAt && (
-                      <div className="tiny muted">
-                        {m.stoppedAt} 停藥{m.stopReason && `（${m.stopReason}）`}
+                      {m.genericName && <div className="tiny muted">{m.genericName}</div>}
+                      <div className="line num">
+                        <BagRead slots={m.slots} asNeeded={m.asNeeded} />
+                        {[TIMING_LABEL[m.timing], m.dose, m.days ? `${m.days} 天` : '長期'].filter(Boolean).join('・')}
                       </div>
-                    )}
+                      {m.purpose && <div className="small soft">{m.purpose}</div>}
+                      {m.appearance && <div className="tiny muted">外觀：{m.appearance}</div>}
+                      {m.cautions && (
+                        <div className="caution">
+                          <Icon.alert />
+                          {m.cautions}
+                        </div>
+                      )}
+                      {m.stoppedAt && (
+                        <div className="tiny muted">
+                          {m.stoppedAt} 停藥{m.stopReason && `（${m.stopReason}）`}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -474,6 +478,11 @@ function MedEditor({ index, med, onChange, onRemove }: { index: number; med: Med
           <input value={med.dose} onChange={(e) => set('dose', e.target.value)} />
         </label>
       </div>
+      <DrugSuggest
+        query={{ name: med.name, genericName: med.genericName, appearance: med.appearance }}
+        value={med.drugLicense ?? null}
+        onChange={(l) => set('drugLicense', l)}
+      />
       <div className="field">
         <span>什麼時候吃</span>
         <div className="bag-boxes">

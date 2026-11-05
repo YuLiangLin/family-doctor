@@ -1,5 +1,5 @@
 // 家裡的 dr-claude-runner 專用（/api/agent，Cloudflare Access 服務憑證；auth.ts 的 AGENT_ROUTES）。
-// runner 只能：領工作、讀工作內容與附件、查紀錄、回報進度、完成、失敗。
+// runner 只能：領工作、讀工作內容與附件、查紀錄、回報進度、完成、失敗；另外幫忙處理藥品照片（runner 程式做，不經過 AI）。
 // 寫入紀錄只能經「完成」帶的 actions：日記、量測直接存（標 Dr.Claude 記的），看診＋用藥只會是草稿，要人在畫面按確認才存。
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -8,12 +8,15 @@ import { addDays, daysBetween, taipeiNow, taipeiToday } from '../../shared/dates
 import { courseProgress, scheduleLabel } from '../../shared/meds';
 import { all, first, run, stmt } from '../db';
 import type { AppEnv, Env } from '../env';
+import { FDA_IMAGE_PREFIX } from '../../shared/drugs';
 import { fail, parseBody, parseId, zDateTime, zId, zIsoDate, zSlot, zText, zTiming } from '../http';
 import { parseJson, toAttachment, type AttachmentRow } from '../mappers';
 import { inBackground, notifyUsers } from '../push';
 import { loadDoseLogs, loadMeasurements, loadMedications, loadMembers, loadNotes, loadVisits } from '../records';
 import { serveAttachment } from './attachments';
 import type { JobRow } from './chat';
+import { loadDrug, type DrugPhotoRow } from './drugs';
+import { sha256Hex } from '../sessions';
 import { checkMeasurement } from './journal';
 
 /** 處理中超過這麼久沒回報（runner 當機、斷電）就算失敗 */
@@ -21,6 +24,24 @@ export const RUNNING_STALE_MINUTES = 15;
 /** 長輪詢最多等幾秒、每隔多久看一次 */
 const MAX_WAIT_SECONDS = 25;
 const POLL_MS = 1500;
+/** 藥品照片：一次領幾張、做多久沒回報就放回佇列、檔案最大多少 */
+const PHOTO_BATCH = 3;
+const PHOTO_STALE_MINUTES = 10;
+const MAX_PHOTO_BYTES = { crop: 1024 * 1024, full: 4 * 1024 * 1024 };
+
+function decodeJpeg(b64: string, max: number): Uint8Array {
+  let bin: string;
+  try {
+    bin = atob(b64);
+  } catch {
+    return fail(400, '照片格式錯誤（base64）');
+  }
+  if (bin.length > max) fail(400, '照片太大');
+  const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) fail(400, '照片要是 JPEG');
+  return bytes;
+}
+
 /** 給 Dr.Claude 看的對話最多幾則 */
 const MAX_HISTORY = 30;
 
@@ -216,9 +237,68 @@ export const agentRoutes = new Hono<AppEnv>()
     for (;;) {
       const job = await claimOne(c.env.DB);
       if (job) return c.json({ id: job.id, kind: job.kind });
+      // 有藥品照片在排隊：先回去讓 runner 處理照片（X-Drug-Photos），不用等滿長輪詢
+      if (await first(c.env.DB, `SELECT 1 FROM drug_photos WHERE status = 'queued' LIMIT 1`)) return c.body(null, 204, { 'X-Drug-Photos': 'queued' });
       if (Date.now() + POLL_MS > deadline) return c.body(null, 204);
       await new Promise((r) => setTimeout(r, POLL_MS));
     }
+  })
+  // ---- 藥品照片（runner 程式下載食藥署原圖、裁到藥丸、縮小後傳回來） ----
+  .post('/drug-photos/claim', async (c) => {
+    const db = c.env.DB;
+    const now = taipeiNow();
+    const stale = taipeiNow(new Date(Date.now() - PHOTO_STALE_MINUTES * 60_000));
+    await run(db, `UPDATE drug_photos SET status = 'queued', updated_at = ? WHERE status = 'working' AND updated_at < ?`, now, stale);
+    const rows = await all<{ license_no: string; image_url: string }>(
+      db,
+      `SELECT p.license_no, c.image_url FROM drug_photos p JOIN drug_catalog c ON c.license_no = p.license_no
+        WHERE p.status = 'queued' AND c.image_url LIKE ? ORDER BY p.requested_at LIMIT ?`,
+      `${FDA_IMAGE_PREFIX}%`,
+      PHOTO_BATCH,
+    );
+    const items: { license: string; imageUrl: string }[] = [];
+    for (const r of rows) {
+      const n = await run(db, `UPDATE drug_photos SET status = 'working', attempts = attempts + 1, updated_at = ? WHERE license_no = ? AND status = 'queued'`, now, r.license_no);
+      if (n) items.push({ license: r.license_no, imageUrl: r.image_url });
+    }
+    return c.json({ items });
+  })
+  .post('/drug-photos/:license', async (c) => {
+    const db = c.env.DB;
+    const license = c.req.param('license');
+    const b = await parseBody(c, z.object({ sourceUrl: z.string().max(500), cropped: z.boolean(), crop: z.string().min(10), full: z.string().min(10) }));
+    const p = await first<DrugPhotoRow>(db, 'SELECT * FROM drug_photos WHERE license_no = ?', license);
+    if (!p || p.status !== 'working') return fail(409, '這張照片不是處理中（可能已經做好或逾時了）');
+    if (!(await loadDrug(db, license))) return fail(404, '找不到這個藥');
+    const crop = decodeJpeg(b.crop, MAX_PHOTO_BYTES.crop);
+    const full = decodeJpeg(b.full, MAX_PHOTO_BYTES.full);
+    const prefix = `drug-photos/${(await sha256Hex(license)).slice(0, 32)}`;
+    await c.env.FILES.put(`${prefix}/crop.jpg`, crop, { httpMetadata: { contentType: 'image/jpeg' } });
+    await c.env.FILES.put(`${prefix}/full.jpg`, full, { httpMetadata: { contentType: 'image/jpeg' } });
+    await run(
+      db,
+      `UPDATE drug_photos SET status = 'done', source_url = ?, r2_prefix = ?, cropped = ?, error = '', updated_at = ? WHERE license_no = ?`,
+      b.sourceUrl,
+      prefix,
+      b.cropped,
+      taipeiNow(),
+      license,
+    );
+    return c.json({ ok: true });
+  })
+  .post('/drug-photos/:license/fail', async (c) => {
+    const license = c.req.param('license');
+    const { error } = await parseBody(c, z.object({ error: zText(500).default('') }));
+    const drug = await loadDrug(c.env.DB, license);
+    await run(
+      c.env.DB,
+      `UPDATE drug_photos SET status = 'failed', error = ?, source_url = ?, updated_at = ? WHERE license_no = ?`,
+      error,
+      drug?.image_url ?? '',
+      taipeiNow(),
+      license,
+    );
+    return c.json({ ok: true });
   })
   .get('/jobs/:id', async (c) => {
     const job = await runningJob(c.env.DB, parseId(c.req.param('id')));

@@ -2,6 +2,7 @@
 import type {
   ApiToken,
   Attachment,
+  DrugInfo,
   AttachmentKind,
   ChatAction,
   ChatMessage,
@@ -105,6 +106,7 @@ export interface MedicationRow {
   stop_reason: string;
   created_at: string;
   created_by: string;
+  drug_license: string | null;
 }
 
 export const toMedication = (r: MedicationRow): Medication => ({
@@ -129,6 +131,7 @@ export const toMedication = (r: MedicationRow): Medication => ({
   stopReason: r.stop_reason,
   createdAt: r.created_at,
   createdBy: r.created_by,
+  drugLicense: r.drug_license ?? null,
 });
 
 export interface DoseLogRow {
@@ -270,4 +273,33 @@ export const toApiToken = (r: ApiTokenRow): ApiToken => ({
   expiresAt: r.expires_at,
   lastUsedAt: r.last_used_at,
   revokedAt: r.revoked_at,
+});
+
+/** drug_catalog（同步腳本寫入，欄位見 shared/drugs.ts 的 DrugCatalogRow） */
+export interface DrugCatalogDbRow {
+  license_no: string;
+  name_zh: string;
+  name_en: string;
+  shape: string;
+  color: string;
+  score_line: string;
+  size_mm: string;
+  marking: string;
+  special: string;
+  image_url: string;
+  search_text: string;
+}
+
+export const toDrugInfo = (r: DrugCatalogDbRow): DrugInfo => ({
+  licenseNo: r.license_no,
+  // 食藥署的品名有全形數字（５００毫克）：顯示時轉半形
+  nameZh: r.name_zh.normalize('NFKC'),
+  nameEn: r.name_en.normalize('NFKC'),
+  shape: r.shape,
+  color: r.color,
+  scoreLine: r.score_line,
+  sizeMm: r.size_mm,
+  marking: r.marking,
+  special: r.special,
+  hasImage: !!r.image_url,
 });

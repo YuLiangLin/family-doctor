@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   AgentJobContext,
   ApiToken,
+  DrugCandidate,
   CreatedApiToken,
   ConversationDetail,
   Me,
@@ -220,6 +221,109 @@ describe('API token', () => {
     expect(tokenMayCall('log', 'PUT', 'http://x/api/medications/3')).toBe(false);
     expect(tokenMayCall('write', 'PUT', 'http://x/api/medications/3')).toBe(true);
     expect(tokenMayCall('write', 'PATCH', 'http://x/api/users/me')).toBe(false);
+  });
+});
+
+describe('藥品照片', () => {
+  const CEPH_GW = '衛署藥製字第015660號';
+  const CEPH_GY = '衛署藥製字第022105號';
+  const CEPH_TAB = '衛署藥製字第037523號';
+  const img = (id: string) => `https://mcp.fda.gov.tw/insert/shapeImg/${id}?c=o`;
+  const JPEG_B64 = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]).toString('base64');
+
+  async function catalog() {
+    const rows = [
+      [CEPH_GW, '"信東"賜福力欣膠囊 500毫克', 'Cephalexin Capsules 500mg "TBC"', '膠囊', '綠、白', img('a')],
+      [CEPH_GY, '"優良"優力黴素膠囊５００毫克（賜福力欣）', 'ULEXIN CAPSULES 500MG (CEPHALEXIN)', '膠囊', '綠、黃', img('b')],
+      [CEPH_TAB, '賜福力欣膜衣錠５００毫克', 'CEPHALEXIN F.C.TABLET 500MG "TBC"', '橢圓形', '橘', img('c')],
+      ['衛署藥製字第000001號', '"福元"蘇打錠500毫克', 'SODIUM BICARBONATE TABLETS "F.Y."', '圓形', '白', ''],
+    ];
+    const { normalizeDrugText } = await import('../src/shared/drugs');
+    for (const [license, zh, en, shape, color, url] of rows) {
+      await shim
+        .asD1()
+        .prepare(`INSERT INTO drug_catalog (license_no, name_zh, name_en, shape, color, image_url, search_text, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, '2026-11-04 00:00:00')`)
+        .bind(license, zh, en, shape, color, url, normalizeDrugText(`${en} ${zh}`))
+        .run();
+    }
+  }
+
+  it('從藥袋的藥名＋外觀找候選：顏色、劑型對得上的排前面', async () => {
+    await seed();
+    await catalog();
+    const r = await call<DrugCandidate[]>('GET', `/drugs/match?name=${encodeURIComponent('CEPHALEXIN 500MG')}&appearance=${encodeURIComponent('綠白膠囊')}`);
+    expect(r.json.map((x) => x.licenseNo)).toEqual([CEPH_GW, CEPH_GY, CEPH_TAB]);
+    expect(r.json[0].colorAgreement).toBe('match');
+    expect(r.json[2].colorAgreement).toBe('mismatch');
+    const q = await call<DrugCandidate[]>('GET', `/drugs?q=${encodeURIComponent('賜福力欣')}`);
+    expect(q.json).toHaveLength(3);
+    expect((await call('GET', `/drugs/${encodeURIComponent(CEPH_GW)}`)).status).toBe(200);
+  });
+
+  it('用藥對到哪一款：存看診時一起存、之後可以換或拿掉；亂填的字號擋下來', async () => {
+    const { dad } = await seed();
+    await catalog();
+    const bad = await call('POST', '/visits', { body: { memberId: dad, visitDate: '2026-11-04', medications: [{ ...MEDS[0], drugLicense: '衛署藥製字第999999號' }] } });
+    expect(bad.status).toBe(400);
+    const v = await call<{ id: number }>('POST', '/visits', { body: { memberId: dad, visitDate: '2026-11-04', medications: [{ ...MEDS[0], drugLicense: CEPH_GY }] } });
+    const med = (await call<VisitDetail>('GET', `/visits/${v.json.id}`)).json.medications[0];
+    expect(med.drugLicense).toBe(CEPH_GY);
+    await call('POST', `/medications/${med.id}/drug`, { body: { license: CEPH_GW } });
+    expect((await call<VisitDetail>('GET', `/visits/${v.json.id}`)).json.medications[0].drugLicense).toBe(CEPH_GW);
+    await call('POST', `/medications/${med.id}/drug`, { body: { license: null } });
+    expect((await call<VisitDetail>('GET', `/visits/${v.json.id}`)).json.medications[0].drugLicense).toBeNull();
+  });
+
+  it('照片：第一次要排隊給 runner 做，交回來之後就從 R2 拿；只有 runner 能交', async () => {
+    await seed();
+    await catalog();
+    const path = `/drugs/${encodeURIComponent(CEPH_GW)}/photo`;
+    expect((await call<{ status: string }>('GET', `${path}/status`)).json.status).toBe('queued');
+    const first = await call<{ status: string }>('GET', path);
+    expect(first.status).toBe(404);
+    expect(first.json.status).toBe('queued');
+    // 有照片在排隊：runner 的長輪詢馬上回來
+    const res = await app.request('http://localhost/api/agent/jobs/claim?wait=25', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }, env({ DEV_AUTH_EMAIL: RUNNER }));
+    expect(res.status).toBe(204);
+    expect(res.headers.get('X-Drug-Photos')).toBe('queued');
+    expect((await call('POST', '/agent/drug-photos/claim', { body: {} })).status).toBe(403);
+    const claim = await call<{ items: { license: string; imageUrl: string }[] }>('POST', '/agent/drug-photos/claim', { as: RUNNER, body: {} });
+    expect(claim.json.items).toEqual([{ license: CEPH_GW, imageUrl: img('a') }]);
+    const up = await call('POST', `/agent/drug-photos/${encodeURIComponent(CEPH_GW)}`, { as: RUNNER, body: { sourceUrl: img('a'), cropped: true, crop: JPEG_B64, full: JPEG_B64 } });
+    expect(up.status).toBe(200);
+    expect((await call<{ status: string }>('GET', `${path}/status`)).json.status).toBe('done');
+    const photo = await app.request(`http://localhost/api${path}`, {}, env({ DEV_AUTH_EMAIL: ADMIN }));
+    expect(photo.status).toBe(200);
+    expect(photo.headers.get('Content-Type')).toBe('image/jpeg');
+    expect(new Uint8Array(await photo.arrayBuffer())[0]).toBe(0xff);
+    // 沒有照片的藥
+    expect((await call<{ status: string }>('GET', `/drugs/${encodeURIComponent('衛署藥製字第000001號')}/photo`)).json.status).toBe('none');
+  });
+
+  it('照片做不出來：失敗三次就不再自動重試', async () => {
+    await seed();
+    await catalog();
+    const path = `/drugs/${encodeURIComponent(CEPH_GY)}/photo`;
+    for (let i = 0; i < 3; i++) {
+      expect((await call<{ status: string }>('GET', path)).json.status).toBe('queued');
+      const c = await call<{ items: unknown[] }>('POST', '/agent/drug-photos/claim', { as: RUNNER, body: {} });
+      expect(c.json.items).toHaveLength(1);
+      await call('POST', `/agent/drug-photos/${encodeURIComponent(CEPH_GY)}/fail`, { as: RUNNER, body: { error: '逾時' } });
+    }
+    expect((await call<{ status: string }>('GET', path)).json.status).toBe('failed');
+  });
+
+  it('API token：唯讀能找藥、看照片；完整寫入能幫用藥對照片', async () => {
+    const { dad } = await seed();
+    await catalog();
+    const read = (await call<CreatedApiToken>('POST', '/tokens', { body: { name: 'r', scope: 'read', days: 1 } })).json.token;
+    const write = (await call<CreatedApiToken>('POST', '/tokens', { body: { name: 'w', scope: 'write', days: 1 } })).json.token;
+    const auth = (t: string) => ({ headers: { Authorization: `Bearer ${t}` }, env: { DEV_AUTH_EMAIL: '' } });
+    expect((await call('GET', `/drugs/match?name=CEPHALEXIN`, auth(read))).status).toBe(200);
+    expect((await call('GET', `/drugs/${encodeURIComponent(CEPH_GW)}/photo`, auth(read))).status).toBe(404);
+    const med = await call<{ id: number }>('POST', '/medications', { body: { memberId: dad, startDate: '2026-11-04', ...MEDS[0] } });
+    expect((await call('POST', `/medications/${med.json.id}/drug`, { body: { license: CEPH_GW }, ...auth(read) })).status).toBe(403);
+    expect((await call('POST', `/medications/${med.json.id}/drug`, { body: { license: CEPH_GW }, ...auth(write) })).status).toBe(200);
   });
 });
 

@@ -80,4 +80,6 @@ export const medicationFields = {
   days: z.number().int().min(1, '天數至少 1 天').max(3650).nullable().default(null),
   mustFinish: z.boolean().default(false),
   cautions: zText(500).default(''),
+  /** 食藥署許可證字號（有照片）；不給＝不改（新增時是沒有） */
+  drugLicense: z.string().trim().min(1).max(40).nullable().optional(),
 };

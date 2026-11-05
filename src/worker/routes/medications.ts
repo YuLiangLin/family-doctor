@@ -7,6 +7,7 @@ import type { AppEnv } from '../env';
 import { fail, medicationFields, parseBody, parseId, zId, zIsoDate, zRequiredText, zSlot, zText } from '../http';
 import { toMedication, type MedicationRow } from '../mappers';
 import { requireMember } from '../records';
+import { requireDrugs } from './drugs';
 import { insertMedicationStmt } from './visits';
 
 const createSchema = z.object({ memberId: zId, visitId: zId.nullable().default(null), startDate: zIsoDate, ...medicationFields });
@@ -29,6 +30,7 @@ export const medicationsRoutes = new Hono<AppEnv>()
       const v = await first<{ member_id: number }>(c.env.DB, 'SELECT member_id FROM visits WHERE id = ? AND voided_at IS NULL', b.visitId);
       if (!v || v.member_id !== b.memberId) fail(400, '看診紀錄不對');
     }
+    await requireDrugs(c.env.DB, [b.drugLicense]);
     const res = await insertMedicationStmt(c.env.DB, b.memberId, b.visitId, b.startDate, b, c.get('user').email, taipeiNow()).run();
     return c.json({ id: res.meta.last_row_id }, 201);
   })
@@ -59,6 +61,19 @@ export const medicationsRoutes = new Hono<AppEnv>()
       c.get('user').email,
       id,
     );
+    if (b.drugLicense !== undefined) {
+      await requireDrugs(c.env.DB, [b.drugLicense]);
+      await run(c.env.DB, 'UPDATE medications SET drug_license = ? WHERE id = ?', b.drugLicense, id);
+    }
+    return c.json({ ok: true });
+  })
+  // 對到食藥署哪一款（有照片）；null＝拿掉
+  .post('/:id/drug', async (c) => {
+    const id = parseId(c.req.param('id'));
+    await requireMedication(c.env.DB, id);
+    const { license } = await parseBody(c, z.object({ license: z.string().trim().min(1).max(40).nullable() }));
+    await requireDrugs(c.env.DB, [license]);
+    await run(c.env.DB, 'UPDATE medications SET drug_license = ?, updated_at = ?, updated_by = ? WHERE id = ?', license, taipeiNow(), c.get('user').email, id);
     return c.json({ ok: true });
   })
   // 停藥（醫生說可以停、或有副作用）：那天起不排；抗生素要寫原因

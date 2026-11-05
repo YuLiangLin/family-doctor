@@ -1,9 +1,10 @@
 import { useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { DoseLog, Medication, TodayResponse } from '../../shared/apiTypes';
+import type { DoseLog, Medication, Member, TodayResponse } from '../../shared/apiTypes';
 import { taipeiNow } from '../../shared/dates';
 import { courseProgress, dosesOn, isActive, SLOT_INFO, SLOTS, TIMING_LABEL, type DueDose, type Slot } from '../../shared/meds';
 import { api, ApiRequestError } from '../api';
+import { DrugLightbox, DrugPhoto } from '../components/DrugPhoto';
 import { MEASURE_ICON } from '../components/QuickAdd';
 import { Avatar, ErrorBox, Icon, InkMark, OtterFace, PageHead, PageSkeleton, SlotIcon, toast, UserAvatar } from '../components/ui';
 import { dayLabel, hhmm, weekday } from '../format';
@@ -334,11 +335,18 @@ function errText(e: unknown) {
   return e instanceof ApiRequestError ? e.message : '沒有存到，請再試一次';
 }
 
+/** 有藥品照片就放照片（右下角是誰的頭像），沒有就放頭像 */
+function MedVisual({ med, member, onZoom }: { med: Medication; member: Member | undefined; onZoom: () => void }) {
+  if (!med.drugLicense) return <Avatar member={member} size={38} />;
+  return <DrugPhoto license={med.drugLicense} size={48} badge={<Avatar member={member} size={20} />} onClick={onZoom} label={`看 ${med.name} 的照片`} />;
+}
+
 function DoseRow({ med, date, slot, mark, onChanged }: { med: Medication; date: string; slot: Slot; mark: DoseLog | undefined; onChanged: () => void }) {
   const { members } = useSession();
   const [busy, setBusy] = useState(false);
   const [justDrew, setJustDrew] = useState(false);
   const [optimistic, setOptimistic] = useState<'taken' | null | undefined>(undefined);
+  const [zoom, setZoom] = useState(false);
   const state = optimistic === undefined ? (mark?.status ?? null) : optimistic;
   const member = members.find((m) => m.id === med.memberId);
   const toggle = async () => {
@@ -366,7 +374,8 @@ function DoseRow({ med, date, slot, mark, onChanged }: { med: Medication; date: 
   const sub = [member?.name, med.dose, slot !== 'bedtime' && timing ? `${SLOT_INFO[slot].meal}${timing}` : '', med.appearance].filter(Boolean).join('・');
   return (
     <div className={`dose${state === 'taken' ? ' done' : ''}`}>
-      <Avatar member={member} size={38} />
+      <MedVisual med={med} member={member} onZoom={() => setZoom(true)} />
+      {zoom && med.drugLicense && <DrugLightbox license={med.drugLicense} title={med.name} onClose={() => setZoom(false)} />}
       <div className="grow">
         <div className="med-name">
           {med.name}
@@ -400,11 +409,13 @@ function DoseRow({ med, date, slot, mark, onChanged }: { med: Medication; date: 
 function PrnRow({ med, date, logs, onChanged }: { med: Medication; date: string; logs: DoseLog[]; onChanged: () => void }) {
   const { members } = useSession();
   const [busy, setBusy] = useState(false);
+  const [zoom, setZoom] = useState(false);
   const member = members.find((m) => m.id === med.memberId);
   const todays = logs.filter((l) => l.medicationId === med.id && l.slot === 'prn' && l.doseDate === date);
   return (
     <div className="dose">
-      <Avatar member={member} size={38} />
+      <MedVisual med={med} member={member} onZoom={() => setZoom(true)} />
+      {zoom && med.drugLicense && <DrugLightbox license={med.drugLicense} title={med.name} onClose={() => setZoom(false)} />}
       <div className="grow">
         <div className="med-name">
           {med.name}

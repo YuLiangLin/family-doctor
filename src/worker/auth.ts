@@ -149,6 +149,9 @@ const AGENT_ROUTES: { method: string; path: RegExp }[] = [
   { method: 'GET', path: /^\/api\/agent\/jobs\/\d+\/attachments\/\d+$/ },
   { method: 'GET', path: /^\/api\/agent\/records$/ },
   { method: 'POST', path: /^\/api\/agent\/jobs\/\d+\/(progress|complete|fail)$/ },
+  // 藥品照片：領、交回（裁好的 JPEG）、失敗
+  { method: 'POST', path: /^\/api\/agent\/drug-photos\/claim$/ },
+  { method: 'POST', path: /^\/api\/agent\/drug-photos\/[^/]+(\/fail)?$/ },
 ];
 
 export function agentMayCall(method: string, url: string): boolean {
@@ -160,9 +163,9 @@ export const isAgentPath = (url: string) => /^\/api\/agent(\/|$)/.test(new URL(u
 
 /**
  * API token 能呼叫的 API（其他一律 403），依權限一層包一層：
- * - read 唯讀：今天、時間軸、家人、看診、用藥、附件
+ * - read 唯讀：今天、時間軸、家人、看診、用藥、附件、藥品資料與照片
  * - log 再加：記身體狀況、量測、打勾（含作廢、取消打勾）
- * - write 再加：家人、看診、用藥（直接生效，created_by 記成 token:<id>:<名稱>，畫面標「經 API」）、上傳附件
+ * - write 再加：家人、看診、用藥（直接生效，created_by 記成 token:<id>:<名稱>，畫面標「經 API」）、用藥對照片、上傳附件
  * 都不能：管帳號（/users）、建 token（/tokens）、通知裝置（/push）、Dr.Claude 對話與讀藥袋（/chat、/scan）、移除家人、/api/agent。
  */
 const TOKEN_ROUTES: Record<TokenScope, { method: string; path: RegExp }[]> = {
@@ -173,6 +176,8 @@ const TOKEN_ROUTES: Record<TokenScope, { method: string; path: RegExp }[]> = {
     { method: 'GET', path: /^\/api\/visits(\/\d+)?$/ },
     { method: 'GET', path: /^\/api\/medications\/\d+$/ },
     { method: 'GET', path: /^\/api\/attachments\/\d+(\/file)?$/ },
+    { method: 'GET', path: /^\/api\/drugs(\/match)?$/ },
+    { method: 'GET', path: /^\/api\/drugs\/[^/]+(\/photo(\/status)?)?$/ },
   ],
   log: [
     { method: 'POST', path: /^\/api\/(notes|measurements)$/ },
@@ -188,7 +193,7 @@ const TOKEN_ROUTES: Record<TokenScope, { method: string; path: RegExp }[]> = {
     { method: 'POST', path: /^\/api\/visits\/\d+\/void$/ },
     { method: 'POST', path: /^\/api\/medications$/ },
     { method: 'PUT', path: /^\/api\/medications\/\d+$/ },
-    { method: 'POST', path: /^\/api\/medications\/\d+\/(stop|resume|void)$/ },
+    { method: 'POST', path: /^\/api\/medications\/\d+\/(stop|resume|void|drug)$/ },
     { method: 'POST', path: /^\/api\/attachments$/ },
   ],
 };

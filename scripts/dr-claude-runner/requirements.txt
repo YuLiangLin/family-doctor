@@ -1,5 +1,6 @@
 # Dr.Claude 服務（runner.py）的套件：python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-# claude-agent-sdk 內含 Claude Code 執行檔（跟二胎的 AI 評估服務同一版）；Pillow 縮圖、pillow-heif 轉 iPhone 的 HEIC
+# claude-agent-sdk 內含 Claude Code 執行檔（跟二胎的 AI 評估服務同一版）；Pillow 縮圖、pillow-heif 轉 iPhone 的 HEIC；numpy 藥品照片自動裁切
 claude-agent-sdk==0.2.168
 pillow>=10
 pillow-heif>=0.18
+numpy>=1.26

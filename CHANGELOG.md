@@ -2,6 +2,20 @@
 
 每一版開頭的 `> - ` 行是給家人看的更新內容（會顯示在「有新版本了」提醒裡）。
 
+## [0.4.0] - 2026-11-05
+
+> - 每種藥可以配上真實照片（食藥署的藥品外觀資料）：今天頁一眼看出要吃哪一顆，點開看大圖和大小。
+> - 記看診時打藥名，會列出最像的幾款照片，對照藥袋點一下就好。
+
+- 藥品資料：食藥署開放資料「藥品外觀」（export/42）每週同步到 D1 `drug_catalog`（`scripts/sync-drug-catalog.ts`、`.github/workflows/drug-catalog.yml`）。
+- 找候選（`src/shared/drugs.ts`）：全形、公絲／毫克統一；藥名比成分重要、英文從字頭比（Cetirizine 不會對到 Levocetirizine）、劑量對不上扣分、藥袋寫的顏色與劑型加減分。
+- 照片：`drug_photos` 佇列，家裡的 runner 下載原圖、自動裁到藥丸（去掉尺規、背景平面擬合、連通區塊）、縮小後交回存 R2；手機只跟我們的網站拿。
+  還沒好時畫一顆同顏色、同形狀的藥（`PillGlyph`）。runner 多了 numpy。
+- `medications.drug_license`（migration 0003）；`POST /api/medications/:id/drug`；`/api/drugs`、`/api/drugs/match`、`/api/drugs/:license/photo(/status)`。
+  API token 唯讀可以找藥、看照片，完整寫入可以幫用藥對照片。
+- 畫面：今天頁（照片＋右下角頭像）、家人頁、看診頁的藥都有照片，點開看大圖；記看診時列出候選；挑選面板可以自己打字找。
+- 修好：頁面裡打開的面板被頁面動畫框住、跑到頁面最底下（改成畫在最外層）。
+
 ## [0.3.0] - 2026-11-05
 
 > - 設定頁可以建立「API token」，讓 Claude Code 這類 AI 助理幫忙查系統、記錄；它記的會標「經 API」。

@@ -6,6 +6,9 @@ cd "$(dirname "$0")/.."
 [ -d dist/client ] || npm run build
 rm -rf .wrangler/state
 npx wrangler d1 migrations apply DB --local >/dev/null
+# 藥品外觀（食藥署開放資料）：沒網路就跳過，藥品照片的畫面會是空的
+node --experimental-strip-types scripts/sync-drug-catalog.ts --local >/dev/null 2>&1 || echo "⚠️ 藥品資料同步失敗，跳過藥品照片"
+
 # 自己一個 process group：結束時連 wrangler 底下的 workerd 一起關掉（只關 npx 會留下舊的伺服器佔著 8787）
 setsid npx wrangler dev --port 8787 > e2e-server.log 2>&1 &
 PID=$!
