@@ -47,7 +47,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_ENV_FILE = Path("~/.config/dr-claude/env").expanduser()
-DEFAULT_BASE = "https://doctor.nathantw.com"
+# 新網址的 Access 還沒生效：先連舊網址（部署指南 §9，生效後改回 https://doctor.nathantw.com）
+DEFAULT_BASE = "https://doctor.lottery-wangwang.com"
 API_PREFIX = "/api/agent"
 USER_AGENT = "family-doctor-runner/1.0"  # Cloudflare 會擋 Python 預設的 User-Agent
 CLAIM_WAIT_SECONDS = 25
