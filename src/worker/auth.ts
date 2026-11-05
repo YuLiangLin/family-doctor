@@ -47,6 +47,11 @@ export function safePicture(raw: unknown): string {
   }
 }
 
+/** ACCESS_AUD 可以放好幾個（逗號分隔）：每個網域各一個 Access 應用程式（2026-11-05 搬到 doctor.nathantw.com，部署指南 §9） */
+export function accessAudiences(raw: string | undefined): string[] {
+  return [...new Set((raw ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
+}
+
 async function verifyAccess(env: Env & { ACCESS_TEAM_DOMAIN: string; ACCESS_AUD: string }, token: string): Promise<Identity> {
   const team = normalizeTeamDomain(env.ACCESS_TEAM_DOMAIN);
   let jwks = jwksCache.get(team);
@@ -56,7 +61,7 @@ async function verifyAccess(env: Env & { ACCESS_TEAM_DOMAIN: string; ACCESS_AUD:
   }
   let payload: JWTPayload;
   try {
-    ({ payload } = await jwtVerify(token, jwks, { issuer: team, audience: env.ACCESS_AUD, algorithms: ['RS256'] }));
+    ({ payload } = await jwtVerify(token, jwks, { issuer: team, audience: accessAudiences(env.ACCESS_AUD), algorithms: ['RS256'] }));
   } catch {
     return fail(401, '登入憑證無效或已過期，請重新整理頁面');
   }
@@ -242,7 +247,7 @@ async function loadTokenUser(env: Env, raw: string): Promise<CurrentUser | null>
 
 function requireAccessConfig(env: Env): { ACCESS_TEAM_DOMAIN: string; ACCESS_AUD: string } {
   const { ACCESS_TEAM_DOMAIN, ACCESS_AUD } = env;
-  if (!ACCESS_TEAM_DOMAIN || !ACCESS_AUD) {
+  if (!ACCESS_TEAM_DOMAIN || !ACCESS_AUD || accessAudiences(ACCESS_AUD).length === 0) {
     return fail(500, '系統尚未設定 Cloudflare Access（ACCESS_TEAM_DOMAIN／ACCESS_AUD），請依部署指南設定');
   }
   return { ACCESS_TEAM_DOMAIN, ACCESS_AUD };
