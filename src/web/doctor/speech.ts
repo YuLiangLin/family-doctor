@@ -1,18 +1,7 @@
 // 用說的問、聽 Dr.水獺 回答：瀏覽器內建的語音辨識與朗讀（iPhone Safari、Android Chrome 都有）。
 // 注意：語音轉文字是瀏覽器交給自家服務做的（Chrome → Google、iPhone → Apple），朗讀在裝置上做；我們的伺服器只收到轉好的文字。
 
-interface RecognitionLike {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-}
-
-type RecognitionCtor = new () => RecognitionLike;
+import { listenWith, type RecognitionCtor } from './listenCore';
 
 function recognitionCtor(): RecognitionCtor | null {
   const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
@@ -22,33 +11,14 @@ function recognitionCtor(): RecognitionCtor | null {
 export const canListen = () => recognitionCtor() !== null;
 export const canSpeak = () => 'speechSynthesis' in window;
 
-/** 開始聽：說話時不斷回傳目前聽到的字；結束（停頓、按停止）時呼叫 onEnd */
-export function listen(onText: (text: string, final: boolean) => void, onEnd: (error?: string) => void): () => void {
+/** 開始聽（計時、收尾見 listenCore.ts）；回傳停止函式：stop() 收尾、stop(true) 取消 */
+export function listen(onText: (text: string, final: boolean) => void, onEnd: (error?: string, cancelled?: boolean) => void): (cancel?: boolean) => void {
   const Ctor = recognitionCtor();
   if (!Ctor) {
     onEnd('這個瀏覽器不支援語音輸入');
     return () => undefined;
   }
-  const r = new Ctor();
-  r.lang = 'zh-TW';
-  r.interimResults = true;
-  r.continuous = false;
-  let errored: string | undefined;
-  r.onresult = (e) => {
-    let text = '';
-    let final = false;
-    for (let i = 0; i < e.results.length; i++) {
-      text += e.results[i][0].transcript;
-      final = e.results[i].isFinal;
-    }
-    onText(text, final);
-  };
-  r.onerror = (e) => {
-    errored = e.error === 'not-allowed' ? '沒有麥克風權限，請到手機設定打開' : e.error === 'no-speech' ? undefined : `語音辨識：${e.error}`;
-  };
-  r.onend = () => onEnd(errored);
-  r.start();
-  return () => r.stop();
+  return listenWith(Ctor, onText, onEnd);
 }
 
 function zhVoice(): SpeechSynthesisVoice | undefined {

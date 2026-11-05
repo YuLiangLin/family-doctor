@@ -172,20 +172,27 @@ export default function DoctorPage() {
     sendRef.current = send;
   }, [send]);
 
-  /** 開始聽；語音對話模式下說完（停頓）就自動送出 */
+  /**
+   * 開始聽；語音對話模式下說完（停頓）就自動送出。
+   * 按停止、取消時畫面馬上回來，不等瀏覽器（iPhone 常常不回「結束」，speech.ts 會自己收尾、只呼叫一次 onEnd）。
+   */
+  const listenSeq = useRef(0);
   const startListening = () => {
+    stopListening.current(true);
     stopSpeaking();
     setVoicePlaying(false);
     setListening(true);
+    const seq = ++listenSeq.current;
     const base = voiceRef.current || !text ? '' : `${text} `;
     let heard = '';
-    let cancelled = false;
     const stop = listen(
       (t) => {
+        if (seq !== listenSeq.current) return;
         heard = t;
         setText(base + t);
       },
-      (error) => {
+      (error, cancelled) => {
+        if (seq !== listenSeq.current) return;
         setListening(false);
         if (error) {
           toast(error, 'error');
@@ -196,8 +203,12 @@ export default function DoctorPage() {
       },
     );
     stopListening.current = (cancel = false) => {
-      cancelled = cancel;
-      stop();
+      if (seq !== listenSeq.current) return;
+      if (cancel) {
+        listenSeq.current++;
+        setListening(false);
+      }
+      stop(cancel);
     };
   };
 
