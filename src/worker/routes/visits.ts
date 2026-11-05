@@ -7,6 +7,7 @@ import type { AppEnv } from '../env';
 import { fail, medicationFields, parseBody, parseId, zId, zIsoDate, zRequiredText, zText } from '../http';
 import { parseJson, toAttachment, toMedication, toVisit, type AttachmentRow, type MedicationRow, type VisitRow } from '../mappers';
 import { loadVisits, requireMember } from '../records';
+import { requireDrugs } from './drugs';
 
 const visitFields = {
   memberId: zId,
@@ -49,8 +50,8 @@ export function insertMedicationStmt(
   return stmt(
     db,
     `INSERT INTO medications (member_id, visit_id, name, generic_name, category, purpose, appearance, dose, slots, timing, as_needed,
-       start_date, days, must_finish, cautions, note, created_at, created_by, updated_at, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)`,
+       start_date, days, must_finish, cautions, note, created_at, created_by, updated_at, updated_by, drug_license)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?)`,
     memberId,
     visitId,
     m.name,
@@ -70,6 +71,7 @@ export function insertMedicationStmt(
     who,
     now,
     who,
+    m.drugLicense ?? null,
   );
 }
 
@@ -93,6 +95,7 @@ export const visitsRoutes = new Hono<AppEnv>()
     if (b.followUpDate && b.followUpDate < b.visitDate) fail(400, '回診日不能早於看診日');
     const who = c.get('user').email;
     const now = taipeiNow();
+    await requireDrugs(c.env.DB, b.medications.map((m) => m.drugLicense));
     for (const id of b.attachmentIds) {
       const a = await first<{ created_by: string; visit_id: number | null }>(c.env.DB, 'SELECT created_by, visit_id FROM attachments WHERE id = ? AND deleted_at IS NULL', id);
       if (!a) fail(400, `找不到附件 #${id}`);

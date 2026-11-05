@@ -176,3 +176,87 @@ class HandleTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+try:
+    import numpy  # noqa: F401
+    from PIL import Image, ImageDraw
+
+    HAVE_IMAGING = True
+except ImportError:  # CI 的機器沒裝也沒關係：這組跳過
+    HAVE_IMAGING = False
+
+
+def fake_fda_photo(size=(900, 700)):
+    """假的食藥署照片：灰色漸層背景、左下角尺規、中間偏右上兩顆綠色藥"""
+    img = Image.new("RGB", size, (200, 200, 205))
+    d = ImageDraw.Draw(img)
+    for x in range(size[0]):
+        d.line([(x, 0), (x, size[1])], fill=(190 + x * 30 // size[0], 190 + x * 30 // size[0], 200))
+    d.line([(80, 40), (80, 620)], fill=(10, 10, 10), width=3)
+    d.line([(80, 620), (860, 620)], fill=(10, 10, 10), width=3)
+    for i in range(0, 780, 15):
+        d.line([(80 + i, 620), (80 + i, 600 if i % 75 == 0 else 610)], fill=(10, 10, 10), width=2)
+        d.text((76 + i, 630), str(i // 15), fill=(10, 10, 10))
+    d.ellipse([420, 220, 520, 320], fill=(80, 170, 110))
+    d.ellipse([540, 220, 640, 320], fill=(80, 170, 110))
+    return img
+
+
+@unittest.skipUnless(HAVE_IMAGING, "沒裝 Pillow／numpy")
+class DrugPhotoTest(unittest.TestCase):
+    def test_pill_box_finds_pills_not_ruler(self):
+        box = runner.pill_box(fake_fda_photo())
+        self.assertIsNotNone(box)
+        x0, y0, x1, y1 = box
+        self.assertTrue(400 <= x0 <= 430 and 630 <= x1 <= 660, box)
+        self.assertTrue(200 <= y0 <= 230 and 310 <= y1 <= 340, box)
+
+    def test_blank_photo_is_not_cropped(self):
+        img = Image.new("RGB", (600, 400), (240, 240, 240))
+        self.assertIsNone(runner.pill_box(img))
+
+    def test_make_drug_photo_gives_two_jpegs(self):
+        import base64
+        from io import BytesIO
+
+        buf = BytesIO()
+        fake_fda_photo().save(buf, "PNG")
+        out = runner.make_drug_photo(buf.getvalue())
+        self.assertTrue(out["cropped"])
+        crop = Image.open(BytesIO(base64.b64decode(out["crop"])))
+        self.assertEqual(crop.format, "JPEG")
+        self.assertLessEqual(max(crop.size), runner.PHOTO_CROP_SIDE)
+        self.assertEqual(crop.size[0], crop.size[1])
+
+    def test_only_fda_urls(self):
+        with self.assertRaises(ValueError):
+            runner.fetch_fda_image("https://evil.example.com/a.png")
+
+    def test_process_reports_success_and_failure(self):
+        from io import BytesIO
+
+        buf = BytesIO()
+        fake_fda_photo().save(buf, "PNG")
+        calls = []
+
+        class FakePlatform:
+            def call(self, method, path, body=None, timeout=60):
+                calls.append((method, path, body))
+                if path == "/drug-photos/claim":
+                    return 200, {"items": [{"license": "衛署藥製字第015660號", "imageUrl": "https://mcp.fda.gov.tw/a"},
+                                           {"license": "壞掉的", "imageUrl": "https://mcp.fda.gov.tw/b"}]}
+                return 200, {"ok": True}
+
+        def fetch(url):
+            if url.endswith("/b"):
+                raise ValueError("下載失敗")
+            return buf.getvalue()
+
+        self.assertEqual(runner.process_drug_photos(FakePlatform(), fetch=fetch), 1)
+        paths = [c[1] for c in calls]
+        self.assertIn("/drug-photos/%E8%A1%9B%E7%BD%B2%E8%97%A5%E8%A3%BD%E5%AD%97%E7%AC%AC015660%E8%99%9F", paths)
+        self.assertIn("/drug-photos/%E5%A3%9E%E6%8E%89%E7%9A%84/fail", paths)
+        ok = next(c for c in calls if c[1].startswith("/drug-photos/%E8%A1%9B"))
+        self.assertEqual(ok[2]["sourceUrl"], "https://mcp.fda.gov.tw/a")
+        self.assertTrue(ok[2]["cropped"])

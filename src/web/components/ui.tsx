@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { tokenActorName, type Member } from '../../shared/apiTypes';
 import type { Slot } from '../../shared/meds';
 import type { ApiRequestError } from '../api';
@@ -221,7 +222,8 @@ export function Panel({ title, onClose, children, wide }: { title: string; onClo
       document.body.style.overflow = prev;
     };
   }, [onClose]);
-  return (
+  // 畫在 body 底下：頁面有進場動畫（transform），面板放在頁面裡會被框在頁面範圍內
+  return createPortal(
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="panel" role="dialog" aria-modal="true" aria-labelledby={id} ref={ref} style={wide ? { maxWidth: 680 } : undefined}>
         <div className="panel-grip" aria-hidden />
@@ -233,7 +235,8 @@ export function Panel({ title, onClose, children, wide }: { title: string; onClo
         </div>
         <div className="panel-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

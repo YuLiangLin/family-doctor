@@ -5,6 +5,7 @@ import { MEASUREMENT_INFO } from '../../shared/apiTypes';
 import { addDays, taipeiToday } from '../../shared/dates';
 import { courseProgress, isActive, scheduleLabel } from '../../shared/meds';
 import { api } from '../api';
+import { MedPhotoSlot } from '../components/DrugPhoto';
 import { MEASURE_ICON, MeasurePanel } from '../components/QuickAdd';
 import { Avatar, confirmDialog, Empty, ErrorBox, Icon, OtterFace, PageHead, PageSkeleton, Panel, promptDialog, toast, ViaTag } from '../components/ui';
 import { dayLabel } from '../format';
@@ -448,33 +449,36 @@ export function MemberPage() {
                 {current.map((x) => {
                   const p = courseProgress(x, d.doseLogs, today);
                   return (
-                    <div key={x.id} className="med">
-                      <div className="name">
-                        {x.name}
-                        {x.category && <span className="tag blue">{x.category}</span>}
-                        {x.mustFinish && <span className="tag amber">要吃完</span>}
-                        <ViaTag by={x.createdBy} />
-                      </div>
-                      <div className="line num">
-                        {[x.dose, scheduleLabel(x.slots, x.timing, x.asNeeded), p.totalDays ? `第 ${Math.min(p.dayNo, p.totalDays)}/${p.totalDays} 天` : x.asNeeded ? '' : '長期'].filter(Boolean).join('・')}
-                      </div>
-                      {x.purpose && <div className="small soft">{x.purpose}</div>}
-                      {x.cautions && (
-                        <div className="caution">
-                          <Icon.alert />
-                          {x.cautions}
+                    <div key={x.id} className="med med-with-photo">
+                      <MedPhotoSlot med={x} />
+                      <div className="grow">
+                        <div className="name">
+                          {x.name}
+                          {x.category && <span className="tag blue">{x.category}</span>}
+                          {x.mustFinish && <span className="tag amber">要吃完</span>}
+                          <ViaTag by={x.createdBy} />
                         </div>
-                      )}
-                      <div className="actions">
-                        <button className="btn secondary sm" onClick={() => void stopMed(x.id, x.name, x.mustFinish)}>
-                          停藥
-                        </button>
-                        {x.visitId && (
-                          <Link className="btn ghost sm" to={`/visits/${x.visitId}`}>
-                            看診紀錄
-                            <Icon.chevronRight />
-                          </Link>
+                        <div className="line num">
+                          {[x.dose, scheduleLabel(x.slots, x.timing, x.asNeeded), p.totalDays ? `第 ${Math.min(p.dayNo, p.totalDays)}/${p.totalDays} 天` : x.asNeeded ? '' : '長期'].filter(Boolean).join('・')}
+                        </div>
+                        {x.purpose && <div className="small soft">{x.purpose}</div>}
+                        {x.cautions && (
+                          <div className="caution">
+                            <Icon.alert />
+                            {x.cautions}
+                          </div>
                         )}
+                        <div className="actions">
+                          <button className="btn secondary sm" onClick={() => void stopMed(x.id, x.name, x.mustFinish)}>
+                            停藥
+                          </button>
+                          {x.visitId && (
+                            <Link className="btn ghost sm" to={`/visits/${x.visitId}`}>
+                              看診紀錄
+                              <Icon.chevronRight />
+                            </Link>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

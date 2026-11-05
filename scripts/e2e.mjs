@@ -1,8 +1,11 @@
 // 冒煙測試：本機 wrangler dev（DEV_AUTH_EMAIL）＋ Chromium，用手機寬度走一遍主要畫面並截圖到 e2e-shots/。
 // 用法：npm run build && bash scripts/e2e.sh（會自己起 wrangler dev、建假資料）
 // 假資料：全部是測試用的名字與藥，不是真的病歷。
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 
 const BASE = process.env.E2E_BASE ?? 'http://127.0.0.1:8787';
@@ -17,18 +20,56 @@ function findChromium() {
   throw new Error('找不到 Chromium，請設 CHROMIUM_PATH');
 }
 
-async function api(method, path, body) {
-  const res = await fetch(`${BASE}/api${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+async function api(method, path, body, retry = true) {
+  let res;
+  try {
+    res = await fetch(`${BASE}/api${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (e) {
+    // 中間停太久（下載藥品照片）：閒置的連線被伺服器關掉，重連一次
+    if (retry) return api(method, path, body, false);
+    throw e;
+  }
   const text = await res.text();
   if (!res.ok) throw new Error(`${method} ${path} → ${res.status} ${text}`);
   return text ? JSON.parse(text) : null;
 }
 
 const sql = (q) => execFileSync('npx', ['wrangler', 'd1', 'execute', 'DB', '--local', '--command', q], { stdio: 'pipe' });
+const sqlJson = (q) => JSON.parse(execFileSync('npx', ['wrangler', 'd1', 'execute', 'DB', '--local', '--json', '--command', q], { stdio: 'pipe' }).toString())[0].results;
+
+/** 藥品照片：用 runner 的程式（下載食藥署原圖、自動裁切）做好，直接放進本機的 R2（e2e 沒有 runner） */
+function processDrugPhotos(licenses) {
+  const dir = mkdtempSync(join(tmpdir(), 'fd-drug-'));
+  for (const license of licenses) {
+    const [row] = sqlJson(`SELECT image_url FROM drug_catalog WHERE license_no = '${license.replace(/'/g, "''")}'`);
+    if (!row?.image_url) continue;
+    const py = `import sys, json, base64; sys.path.insert(0, 'scripts/dr-claude-runner'); import runner
+out = runner.make_drug_photo(runner.fetch_fda_image(sys.argv[1]))
+open(sys.argv[2] + '/crop.jpg', 'wb').write(base64.b64decode(out['crop'])); open(sys.argv[2] + '/full.jpg', 'wb').write(base64.b64decode(out['full']))
+print(json.dumps({'cropped': out['cropped']}))`;
+    let cropped;
+    try {
+      cropped = JSON.parse(execFileSync('python3', ['-c', py, row.image_url, dir], { stdio: ['ignore', 'pipe', 'pipe'], timeout: 180_000 }).toString()).cropped;
+    } catch (e) {
+      console.log('⚠️ 藥品照片做不出來（沒網路或沒裝 Pillow／numpy）：', license, String(e).slice(0, 120));
+      continue;
+    }
+    const prefix = `drug-photos/${createHash('sha256').update(license).digest('hex').slice(0, 32)}`;
+    for (const v of ['crop', 'full']) {
+      execFileSync('npx', ['wrangler', 'r2', 'object', 'put', `family-doctor-files/${prefix}/${v}.jpg`, '--file', join(dir, `${v}.jpg`), '--local', '--content-type', 'image/jpeg'], { stdio: 'pipe' });
+    }
+    const q = (s) => `'${s.replace(/'/g, "''")}'`;
+    sql(
+      `INSERT INTO drug_photos (license_no, status, source_url, r2_prefix, cropped, requested_at, updated_at) VALUES (${q(license)}, 'done', ${q(row.image_url)}, ${q(prefix)}, ${cropped ? 1 : 0}, datetime('now'), datetime('now'))
+       ON CONFLICT(license_no) DO UPDATE SET status = 'done', source_url = excluded.source_url, r2_prefix = excluded.r2_prefix, cropped = excluded.cropped;`,
+    );
+    console.log('✓ 藥品照片', license, cropped ? '（裁好）' : '（整張）');
+  }
+}
 
 // ---- 假資料 ----
 const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
@@ -58,6 +99,15 @@ const visit = await api('POST', '/visits', {
 });
 await api('POST', '/medications', { memberId: kid, startDate: today, name: '退燒藥水', category: '退燒止痛', dose: '依藥袋', asNeeded: true });
 const meds = (await api('GET', `/visits/${visit.id}`)).medications;
+// 藥品照片：前兩種藥對到食藥署那一款（第三種留著顯示「加照片」）
+const picked = [];
+for (const m of meds.slice(0, 2)) {
+  const c = await api('GET', `/drugs/match?${new URLSearchParams({ name: m.name, generic: m.genericName, appearance: m.appearance })}`);
+  if (!c.length) continue;
+  await api('POST', `/medications/${m.id}/drug`, { license: c[0].licenseNo });
+  picked.push(c[0].licenseNo);
+}
+processDrugPhotos(picked);
 await api('POST', '/doses', { medicationId: meds[0].id, date: yesterday, slot: 'noon' });
 await api('POST', '/doses', { medicationId: meds[0].id, date: today, slot: 'morning' });
 await api('POST', '/doses', { medicationId: meds[2].id, date: today, slot: 'morning' });
@@ -139,6 +189,20 @@ for (const scheme of ['light', 'dark']) {
   await page.getByRole('button', { name: '取消' }).click();
   await shot(`/visits/${visit.id}`, 'visit');
   await shot('/visits/new', 'visit-new');
+  if (scheme === 'light' && picked.length) {
+    // 記看診：打藥名就列出候選照片
+    await page.getByRole('button', { name: '加一種藥' }).click();
+    await page.getByLabel('藥名（照藥袋）').fill('CEPHALEXIN 500MG');
+    await page.waitForTimeout(2500);
+    await page.getByText('是哪一款？').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${SHOTS}${scheme}-visit-drug-suggest.png` });
+    // 今天頁：點藥品照片看大圖
+    await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: /看 CEPHALEXIN 500MG 的照片/ }).first().click();
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${SHOTS}${scheme}-drug-lightbox.png` });
+    await page.keyboard.press('Escape');
+  }
   await shot(`/doctor/${conv.id}`, 'doctor', 2500);
   await shot('/doctor', 'doctor-new', 2500);
   // 語音對話模式（只看畫面；headless 沒有麥克風）

@@ -2,6 +2,7 @@
 """Dr.Claude 服務：在 Nathan 的 Linux 機器上跑（同二胎的 AI 評估服務），一直向家庭醫生系統領工作：
 - chat：家人問 Dr.Claude 的問題 → 讀全家的健康紀錄、附圖 → 回覆；需要時幫忙記日記、量測，或整理成看診草稿
 - rx_scan：讀藥袋／收據照片 → 產出看診＋用藥草稿（人在畫面確認後才存）
+- 藥品照片（不經過 AI）：從食藥署（只限 mcp.fda.gov.tw）下載藥品外觀原圖 → 自動裁到藥丸、縮小 → 傳回系統存起來
 
 AI 只能用這支程式提供的工具（記日記、記量測、提看診草稿、查更早的紀錄、設表情）和 Read（只讀這件工作的附圖）；
 沒有 Bash、不能上網。寫進系統的東西由這支程式送、伺服器再檢查一次；AI 拿不到服務憑證。
@@ -341,6 +342,195 @@ def prepare_image(raw: bytes, content_type: str, dest: Path) -> Path:
         return dest
 
 
+# ---------- 藥品照片（runner 程式自己做，不經過 AI） ----------
+
+FDA_IMAGE_PREFIX = "https://mcp.fda.gov.tw/"
+MAX_SOURCE_BYTES = 40 * 1024 * 1024
+PHOTO_CROP_SIDE = 480
+PHOTO_FULL_SIDE = 1200
+
+
+def flatten_image(img):
+    """透明背景鋪白、轉 RGB"""
+    from PIL import Image
+
+    if img.mode in ("RGBA", "LA", "P"):
+        img = img.convert("RGBA")
+        bg = Image.new("RGBA", img.size, "white")
+        bg.alpha_composite(img)
+        img = bg
+    return img.convert("RGB")
+
+
+def _components(mask):
+    """4 連通的區塊：[(像素數, x0, y0, x1, y1)]"""
+    from collections import deque
+
+    import numpy as np
+
+    h, w = mask.shape
+    seen = np.zeros((h, w), dtype=bool)
+    out = []
+    for y0, x0 in zip(*np.nonzero(mask)):
+        if seen[y0, x0]:
+            continue
+        seen[y0, x0] = True
+        q = deque([(y0, x0)])
+        cnt, minx, maxx, miny, maxy = 0, x0, x0, y0, y0
+        while q:
+            y, x = q.popleft()
+            cnt += 1
+            minx, maxx, miny, maxy = min(minx, x), max(maxx, x), min(miny, y), max(maxy, y)
+            for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                if 0 <= ny < h and 0 <= nx < w and mask[ny, nx] and not seen[ny, nx]:
+                    seen[ny, nx] = True
+                    q.append((ny, nx))
+        out.append((cnt, int(minx), int(miny), int(maxx) + 1, int(maxy) + 1))
+    return out
+
+
+def pill_box(img, side: int = 320):
+    """食藥署照片裡藥丸的位置（原圖座標）；找不到回 None。
+    照片多半是藥丸＋尺規、背景有漸層：去掉暗而沒顏色的（尺規、字），用平面擬合背景，留下跟背景差很多的區塊，
+    再丟掉碰到邊（陰影）、太細（線）、太小（字）的，剩下的框起來。沒裝 numpy 就不裁。"""
+    try:
+        import numpy as np
+        from PIL import Image, ImageFilter
+    except ImportError:
+        return None
+    small = img.copy()
+    small.thumbnail((side, side))
+    a = np.asarray(small, dtype=float)
+    h, w, _ = a.shape
+    if h < 20 or w < 20:
+        return None
+    mx, mn = a.max(-1), a.min(-1)
+    lum = a @ np.array([0.299, 0.587, 0.114])
+    sat = (mx - mn) / np.maximum(mx, 1)
+    ink = (lum < 110) & (sat < 0.3)
+    yy, xx = np.mgrid[0:h, 0:w]
+    design = np.stack([xx / w, yy / h, np.ones_like(xx, dtype=float)], -1)
+
+    def plane(keep):
+        ys, xs = np.nonzero(keep)
+        if len(ys) < 50:
+            return np.broadcast_to(np.median(a.reshape(-1, 3), 0), a.shape)
+        A = design[ys, xs]
+        out = np.empty_like(a)
+        for ch in range(3):
+            coef, *_ = np.linalg.lstsq(A, a[ys, xs, ch], rcond=None)
+            out[..., ch] = design @ coef
+        return out
+
+    keep = ~ink
+    d = np.abs(a - plane(keep)).max(-1)
+    keep2 = keep & (d < np.percentile(d[keep], 60))
+    dist = np.sqrt(((a - plane(keep2)) ** 2).sum(-1))
+    noise = float(np.median(dist[keep2])) if keep2.any() else 5.0
+    # 尺規、字的周圍（縮圖後的灰邊）也不算：墨水往外擴幾格
+    near_ink = np.asarray(Image.fromarray((ink * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))) > 0
+    mask = (dist > max(28.0, noise * 4)) & ~near_ink
+    m = Image.fromarray((mask * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.MaxFilter(3))
+    mask = np.asarray(m) > 0
+
+    def ok(c):
+        cnt, x0, y0, x1, y1 = c
+        bw, bh = x1 - x0, y1 - y0
+        if cnt < h * w * 0.0008 or min(bw, bh) < 7 or max(bw, bh) / max(1, min(bw, bh)) >= 6:
+            return False
+        if x0 <= 1 or y0 <= 1 or x1 >= w - 1 or y1 >= h - 1:
+            return False
+        return bw * bh <= h * w * 0.45
+
+    comps = [c for c in _components(mask) if ok(c)]
+    if not comps:
+        return None
+    # 從最大的一塊開始，只併進夠大、而且離得近的（同一張照片裡的正反面兩顆藥）
+    comps.sort(key=lambda c: -c[0])
+    main = comps[0]
+    reach = max(main[3] - main[1], main[4] - main[2]) * 1.5
+    keep_c = [main]
+    for c in comps[1:]:
+        if c[0] < main[0] * 0.25:
+            continue
+        gx = max(0, max(c[1], main[1]) - min(c[3], main[3]))
+        gy = max(0, max(c[2], main[2]) - min(c[4], main[4]))
+        if max(gx, gy) <= reach:
+            keep_c.append(c)
+    comps = keep_c
+    scale = img.width / w
+    x0, y0 = min(c[1] for c in comps), min(c[2] for c in comps)
+    x1, y1 = max(c[3] for c in comps), max(c[4] for c in comps)
+    return (x0 * scale, y0 * scale, x1 * scale, y1 * scale)
+
+
+def crop_square(img, box, pad: float = 0.18):
+    """藥丸外面留一點邊、裁成正方形（碰到邊就往內移）"""
+    x0, y0, x1, y1 = box
+    side = int(min(max(x1 - x0, y1 - y0) * (1 + pad * 2), img.width, img.height))
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    left = int(min(max(0, cx - side / 2), img.width - side))
+    top = int(min(max(0, cy - side / 2), img.height - side))
+    return img.crop((left, top, left + side, top + side))
+
+
+def jpeg_b64(img, side: int, quality: int) -> str:
+    import base64
+    from io import BytesIO
+
+    img = img.copy()
+    img.thumbnail((side, side))
+    buf = BytesIO()
+    img.save(buf, "JPEG", quality=quality, optimize=True)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def fetch_fda_image(url: str) -> bytes:
+    if not url.startswith(FDA_IMAGE_PREFIX):
+        raise ValueError("只接受食藥署的照片網址")
+    req = urllib.request.Request(url, headers={"User-Agent": "family-doctor-runner/1.0"})
+    with urllib.request.urlopen(req, timeout=120) as res:  # noqa: S310 — 上面已限定網址
+        data = res.read(MAX_SOURCE_BYTES + 1)
+    if len(data) > MAX_SOURCE_BYTES:
+        raise ValueError("原圖太大")
+    return data
+
+
+def make_drug_photo(raw: bytes) -> dict:
+    """原圖 → {crop, full, cropped}（base64 JPEG）"""
+    from io import BytesIO
+
+    from PIL import Image, ImageOps
+
+    img = flatten_image(ImageOps.exif_transpose(Image.open(BytesIO(raw))))
+    box = pill_box(img)
+    crop = crop_square(img, box) if box else img
+    return {"crop": jpeg_b64(crop, PHOTO_CROP_SIDE, 84), "full": jpeg_b64(img, PHOTO_FULL_SIDE, 80), "cropped": box is not None}
+
+
+def process_drug_photos(platform: "Platform", fetch=fetch_fda_image) -> int:
+    """領排隊中的藥品照片來做；回傳做了幾張"""
+    status, body = platform.call("POST", "/drug-photos/claim", {}, timeout=30)
+    if status != 200 or not isinstance(body, dict):
+        return 0
+    done = 0
+    for item in body.get("items", []):
+        license_no = str(item.get("license", ""))
+        url = str(item.get("imageUrl", ""))
+        path = "/drug-photos/" + urllib.parse.quote(license_no, safe="")
+        try:
+            photo = make_drug_photo(fetch(url))
+            st, res = platform.call("POST", path, {"sourceUrl": url, **photo}, timeout=120)
+            if st != 200:
+                raise RuntimeError(f"傳回失敗（{st}）：{err(res)}")
+            done += 1
+            log(f"藥品照片 {license_no}：{'裁好' if photo['cropped'] else '沒裁（整張）'}")
+        except Exception as e:  # noqa: BLE001 — 一張失敗不影響別張
+            log(f"⚠️ 藥品照片 {license_no} 失敗：{e}")
+            platform.call("POST", path + "/fail", {"error": str(e)[:300]}, timeout=30)
+    return done
+
+
 # ---------- 工具 ----------
 
 class Collector:
@@ -608,9 +798,15 @@ def check(cfg: dict[str, str], platform: Platform) -> bool:
     try:
         import PIL  # noqa: F401
 
-        log("✓ Pillow（縮圖、HEIC 轉檔）")
+        log("✓ Pillow（縮圖、HEIC 轉檔、藥品照片）")
     except ImportError:
-        log("⚠️ 沒裝 Pillow：照片會原樣給 AI")
+        log("⚠️ 沒裝 Pillow：照片會原樣給 AI，藥品照片也做不了")
+    try:
+        import numpy  # noqa: F401
+
+        log("✓ numpy（藥品照片自動裁到藥丸）")
+    except ImportError:
+        log("⚠️ 沒裝 numpy：藥品照片不會自動裁切（.venv/bin/pip install -r requirements.txt）")
     key = cfg["FD_ANTHROPIC_API_KEY"]
     req = urllib.request.Request("https://api.anthropic.com/v1/models?limit=1",
                                  headers={"x-api-key": key, "anthropic-version": "2023-06-01", "User-Agent": USER_AGENT})
@@ -654,6 +850,10 @@ def main() -> None:
     log(f"Dr.Claude 服務啟動：{platform.base}")
     backoff = 5
     while not stopping:
+        try:
+            process_drug_photos(platform)
+        except Exception as e:  # noqa: BLE001 — 照片出錯不能卡住 Dr.Claude
+            log(f"⚠️ 藥品照片：{e}")
         try:
             job = platform.claim(0 if args.once else CLAIM_WAIT_SECONDS)
         except RuntimeError as e:

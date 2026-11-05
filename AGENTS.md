@@ -25,6 +25,7 @@
    `created_by` 等欄位記成 `token:<id>:<名稱>`，畫面標「經 API」（`ViaTag`）。
 7. **Dr.Claude 的安全底線**在 `runner.py` 的 `SYSTEM_PROMPT`：不診斷、危險徵兆直接叫就醫（mood urgent）、小孩劑量只照藥袋／仿單、不建議自行停藥。
    改提示時這幾條不能拿掉。runner 不給 Bash、不上網、不載入機器上的 Claude Code 設定。
+   （runner 程式本身會去食藥署下載藥品照片、裁切後傳回系統，只限 `mcp.fda.gov.tw`，不經過 AI；見部署指南 §7。）
 8. **個資不進 repo**：真實病歷、照片、資料庫匯出、`.dev.vars`、API key、服務憑證。測試與 e2e 只用假資料。
 9. 畫面文字用繁體中文；錯誤訊息要讓家人看得懂（`fail(400, '回診日不能早於看診日')`）。
 
@@ -49,6 +50,11 @@ CI 跑的就是前兩項。push 到 `main` 自動部署。workflow 的 job 一�
 ## 發版
 
 改 `package.json` 的 `version`，`CHANGELOG.md` 加 `## [x.y.z] - YYYY-MM-DD` 段落（沒有 build 會失敗）；段落開頭 `> - ` 寫給家人看的白話更新內容。
+
+## 藥品照片
+
+食藥署開放資料「藥品外觀」：每週 `.github/workflows/drug-catalog.yml` 同步到 `drug_catalog`；從藥名找候選、正規化在 `src/shared/drugs.ts`（前後端、同步腳本共用一份）。
+照片由家裡的 runner 下載、自動裁到藥丸、縮小後存 R2（`drug_photos`），手機只跟我們的網站拿。挑錯照片比沒照片糟：一律人點選才算數，不自動選。
 
 ## 加欄位／改資料表
 

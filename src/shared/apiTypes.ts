@@ -103,6 +103,28 @@ export interface Medication {
   stopReason: string;
   createdAt: string;
   createdBy: string;
+  /** 對到食藥署哪一款（許可證字號，有照片）；null＝還沒對 */
+  drugLicense: string | null;
+}
+
+/** 食藥署藥品外觀（/api/drugs） */
+export interface DrugInfo {
+  licenseNo: string;
+  nameZh: string;
+  nameEn: string;
+  shape: string;
+  color: string;
+  scoreLine: string;
+  sizeMm: string;
+  marking: string;
+  special: string;
+  hasImage: boolean;
+}
+
+export interface DrugCandidate extends DrugInfo {
+  score: number;
+  /** 藥袋寫的顏色對不對得上 */
+  colorAgreement: 'match' | 'mismatch' | null;
 }
 
 export interface Visit {
@@ -256,6 +278,8 @@ export interface MedicationDraft {
   days: number | null;
   mustFinish: boolean;
   cautions: string;
+  /** 挑好的食藥署許可證字號（有照片）；沒挑是 null 或不給 */
+  drugLicense?: string | null;
 }
 
 export interface ChatMessage {
