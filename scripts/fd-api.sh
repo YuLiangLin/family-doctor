@@ -9,7 +9,7 @@
 #   scripts/fd-api.sh POST /notes '{"memberId":1,"notedAt":"2026-11-05 09:10","body":"咳嗽","severity":1}'
 # 輸出：回應內容，最後一行是 HTTP 狀態碼。
 set -euo pipefail
-BASE="${FD_BASE_URL:-https://doctor.lottery-wangwang.com}"
+BASE="${FD_BASE_URL:-https://doctor.nathantw.com}"
 method="${1:?用法：fd-api.sh METHOD /path [JSON]}"
 path="${2:?缺 API 路徑，例：/today}"
 body="${3:-}"

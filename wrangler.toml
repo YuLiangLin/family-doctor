@@ -5,8 +5,12 @@ workers_dev = true
 # 預覽網址不受 Access 保護的風險 → 關掉
 preview_urls = false
 
-# 正式網址（Worker custom domain；DNS 與憑證由 Cloudflare 自動建立）。部署用的 API token 要有 Zone → Workers Routes → Edit。
-routes = [{ pattern = "doctor.lottery-wangwang.com", custom_domain = true }]
+# 正式網址（Worker custom domain；DNS 與憑證由 Cloudflare 自動建立）。部署用的 API token 要有兩個網域的 Zone → Workers Routes → Edit。
+# 2026-11-05 搬到 Nathan 自己的網域 nathantw.com；舊網址先留著，畫面會把人轉到新網址（部署指南 §9）。
+routes = [
+  { pattern = "doctor.nathantw.com", custom_domain = true },
+  { pattern = "doctor.lottery-wangwang.com", custom_domain = true },
+]
 
 # 後台另外加的變數（例如 BOOTSTRAP_ADMINS）部署時不會被清掉
 keep_vars = true
@@ -43,7 +47,7 @@ ACCESS_AUD = "8cb331382e4befde4617bd1df5bdb03813cb384ea817c1b066b96ea6d112c65f"
 SUPER_ADMINS = "yliang.lin@gmail.com"
 # 手機通知（Web Push）：公鑰貼這裡，私鑰是 Worker secret VAPID_PRIVATE_KEY（部署指南 §4）
 VAPID_PUBLIC_KEY = ""
-VAPID_SUBJECT = "https://doctor.lottery-wangwang.com"
+VAPID_SUBJECT = "https://doctor.nathantw.com"
 
 # 吃藥提醒（台北 08:00、12:30、18:30、21:30 = UTC 00:00、04:30、10:30、13:30），對應 src/shared/meds.ts 的 SLOTS
 [triggers]
