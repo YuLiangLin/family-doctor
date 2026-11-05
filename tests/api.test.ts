@@ -12,7 +12,7 @@ import type {
   VisitDetail,
   VisitDraft,
 } from '../src/shared/apiTypes';
-import { agentMayCall, tokenMayCall } from '../src/worker/auth';
+import { accessAudiences, agentMayCall, tokenMayCall } from '../src/worker/auth';
 import type { Env } from '../src/worker/env';
 import { app } from '../src/worker/index';
 import { ageText } from '../src/worker/routes/agent';
@@ -109,6 +109,13 @@ describe('登入白名單', () => {
 
   it('沒設 Access 一律拒絕（正式網域）', async () => {
     const res = await app.request('https://doctor.example.com/api/me', {}, env());
+    expect(res.status).toBe(500);
+  });
+
+  it('ACCESS_AUD 可以放好幾個 Access 應用程式（每個網域一個）；只有逗號、空白也算沒設', async () => {
+    expect(accessAudiences('aaa, bbb ,aaa')).toEqual(['aaa', 'bbb']);
+    expect(accessAudiences(' , ')).toEqual([]);
+    const res = await app.request('https://doctor.example.com/api/me', {}, env({ ACCESS_TEAM_DOMAIN: 'https://team.cloudflareaccess.com', ACCESS_AUD: ' , ' }));
     expect(res.status).toBe(500);
   });
 
