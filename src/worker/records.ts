@@ -1,4 +1,4 @@
-// 讀健康紀錄（今天頁、家人頁、時間軸、給 Dr.Claude 的工作內容共用）
+// 讀健康紀錄（今天頁、家人頁、時間軸、給 Dr.水獺 的工作內容共用）
 import type { DoseLog, HealthNote, Measurement, Medication, Member, RunnerState, Visit } from '../shared/apiTypes';
 import { addDays, taipeiNow } from '../shared/dates';
 import { all, first } from './db';

@@ -1,4 +1,4 @@
-// Dr.Claude：海獺醫生（原創角色，模型在 seaOtter.ts）。
+// Dr.水獺：海獺醫生（原創角色，模型在 seaOtter.ts）。
 // 狀態 state 決定身體動作：idle 待機（漂浮、眨眼、偶爾洗臉）、listening 聽（雙手捧臉頰）、thinking 想（抱著膠囊歪頭）、talking 說話。
 // 表情 mood：待機時 happy 拍手、concerned／urgent 雙手合在胸前皺眉；其他狀態只改眉毛（urgent 身體往前傾）。
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
@@ -66,7 +66,7 @@ export default function Otter3D(props: Props) {
       // 建構參數＋renderer 屬性（R3F 兩種都吃）；水面以下靠 clipping 切掉
       gl={{ antialias: true, alpha: true, powerPreference: 'low-power', toneMapping: THREE.NeutralToneMapping, localClippingEnabled: true } as never}
       onCreated={({ camera }) => camera.lookAt(0, 0.02, 0)}
-      aria-label="Dr.Claude 海獺醫生"
+      aria-label="Dr.水獺"
       role="img"
     >
       <Scene {...props} />

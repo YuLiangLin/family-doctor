@@ -17,7 +17,7 @@ export interface Env {
   DEV_AUTH_EMAIL?: string;
   /** 家裡 runner 的 Cloudflare Access 服務憑證白名單：`<Client ID>=名稱`，逗號分隔；沒設＝不接受 */
   AGENT_CLIENT_IDS?: string;
-  /** 每個帳號每天最多問 Dr.Claude 幾次（含讀藥袋；沒設＝60） */
+  /** 每個帳號每天最多問 Dr.水獺 幾次（含讀藥袋；沒設＝60） */
   AI_DAILY_LIMIT?: string;
   VAPID_PUBLIC_KEY?: string;
   /** Worker secret，不進 repo；沒設＝不送通知 */

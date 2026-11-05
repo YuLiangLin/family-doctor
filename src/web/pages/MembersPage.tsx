@@ -202,7 +202,7 @@ function MemberForm({ member, onClose, onSaved }: { member?: Member; onClose: ()
         <label className="field">
           <span>過敏（藥物、食物）</span>
           <input value={f.allergies} onChange={set('allergies')} placeholder="沒有就寫「無」" />
-          <span className="hint">Dr.Claude 每次回答都會先看這一欄。</span>
+          <span className="hint">Dr.水獺 每次回答都會先看這一欄。</span>
         </label>
         <label className="field">
           <span>重要病史、慢性病</span>

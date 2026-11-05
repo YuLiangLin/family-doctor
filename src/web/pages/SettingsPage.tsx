@@ -4,7 +4,7 @@ import { ROLE_LABEL, type PushSettings, type UserRow } from '../../shared/apiTyp
 import { SLOT_INFO, SLOTS } from '../../shared/meds';
 import { api, signInUrl, signOutDevice } from '../api';
 import { ApiTokensSection } from '../components/ApiTokens';
-import { Alert, ErrorBox, Icon, Loading, PageHead, toast, UserAvatar } from '../components/ui';
+import { Alert, confirmDialog, ErrorBox, Icon, Loading, PageHead, promptDialog, toast, UserAvatar } from '../components/ui';
 import { useAction, useApi, useSession } from '../hooks';
 import { isStandalone, platformOf } from '../installApp';
 import { currentSubscription, disablePush, enablePush, pushSupport, PushPermissionError } from '../push';
@@ -50,7 +50,7 @@ export function SettingsPage() {
               </span>
               <span className="grow">
                 我是哪位家人
-                <span>Dr.Claude 預設在問誰、今天頁怎麼稱呼你</span>
+                <span>Dr.水獺 預設在問誰、今天頁怎麼稱呼你</span>
               </span>
               <select
                 className="input"
@@ -123,7 +123,7 @@ export function SettingsPage() {
         <p className="foot-note">
           家庭醫生 v{APP_VERSION}
           <br />
-          Dr.Claude 不是醫師，回答僅供參考；身體有狀況請就醫，緊急時打 119。
+          Dr.水獺 不是醫師，回答僅供參考；身體有狀況請就醫，緊急時打 119。
         </p>
       </div>
     </div>
@@ -148,7 +148,7 @@ function PushSection() {
       </div>
       <div className="card-body stack sm">
         <p className="small soft">
-          {SLOTS.map((sl) => `${SLOT_INFO[sl].label} ${SLOT_INFO[sl].time}`).join('、')}，還沒打勾的藥會推到手機；Dr.Claude 回覆時也會通知。
+          {SLOTS.map((sl) => `${SLOT_INFO[sl].label} ${SLOT_INFO[sl].time}`).join('、')}，還沒打勾的藥會推到手機；Dr.水獺 回覆時也會通知。
         </p>
         {!data ? (
           <Loading />
@@ -236,7 +236,7 @@ function InstallSection() {
 }
 
 function UsersSection() {
-  const { members } = useSession();
+  const { me, members } = useSession();
   const users = useApi<UserRow[]>('/users');
   const act = useAction();
   const [email, setEmail] = useState('');
@@ -246,7 +246,7 @@ function UsersSection() {
       <div className="card-head" style={{ display: 'block' }}>
         <h2>能登入的帳號</h2>
         <p className="small muted" style={{ marginTop: 2 }}>
-          只有清單上的 Google 帳號進得來；小朋友不用帳號。
+          只有清單上的 Google 帳號進得來；小朋友不用帳號。同一個人有好幾個 Google 帳號（例：公司的）可以都加進來，登入後算同一個人。
         </p>
       </div>
       <div className="list" style={{ marginTop: 6, borderTop: '1px solid var(--line)' }}>
@@ -259,6 +259,59 @@ function UsersSection() {
                 {u.email}・{ROLE_LABEL[u.role]}
                 {u.memberId && `・${members.find((m) => m.id === u.memberId)?.name ?? ''}`}
               </span>
+              {(u.emails.length > 0 || me.superAdmin) && (
+                <span className="login-emails">
+                  {u.emails.map((alias) => (
+                    <span key={alias} className="email-chip">
+                      <Icon.key />
+                      {alias}
+                      {me.superAdmin && (
+                        <button
+                          type="button"
+                          aria-label={`拿掉 ${alias}`}
+                          onClick={async () => {
+                            const ok = await confirmDialog({
+                              title: `拿掉 ${alias}？`,
+                              message: '之後不能再用這個 Google 帳號登入；用它登入中的裝置會一起登出。',
+                              confirmText: '拿掉',
+                              danger: true,
+                            });
+                            if (ok && (await act.run(() => api.post(`/users/${encodeURIComponent(u.email)}/emails/remove`, { email: alias })))) {
+                              toast(`已拿掉 ${alias}`);
+                              users.reload();
+                            }
+                          }}
+                        >
+                          <Icon.close />
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                  {me.superAdmin && u.active && (
+                    <button
+                      type="button"
+                      className="email-add"
+                      onClick={async () => {
+                        const alias = await promptDialog({
+                          title: `${u.name || u.email} 的其他 Google 帳號`,
+                          message: '例如公司的 Google 帳號。加進來後用它登入也算同一個人。Cloudflare Access 的「家人」政策也要加這個信箱才登得進來。',
+                          label: 'Google 帳號',
+                          placeholder: 'name@company.com',
+                          required: true,
+                          confirmText: '加入',
+                        });
+                        if (alias && (await act.run(() => api.post(`/users/${encodeURIComponent(u.email)}/emails`, { email: alias })))) {
+                          toast(`已加入 ${alias.trim().toLowerCase()}`);
+                          users.reload();
+                        }
+                      }}
+                    >
+                      <Icon.plus />
+                      其他登入信箱
+                    </button>
+                  )}
+                </span>
+              )}
             </span>
             {!u.superAdmin && (
               <button className="btn ghost sm" onClick={() => act.run(() => api.patch(`/users/${encodeURIComponent(u.email)}`, { active: !u.active })).then(users.reload)}>

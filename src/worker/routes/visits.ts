@@ -29,7 +29,7 @@ const createSchema = z.object({
   medications: z.array(z.object({ ...medicationFields, startDate: zIsoDate.optional() })).max(20).default([]),
   /** 已上傳的藥袋、收據照片 → 掛到這次看診 */
   attachmentIds: z.array(zId).max(20).default([]),
-  /** 從 Dr.Claude 的草稿存的：標記那則訊息的草稿已存 */
+  /** 從 Dr.水獺 的草稿存的：標記那則訊息的草稿已存 */
   fromMessage: z.object({ messageId: zId, actionIndex: z.number().int().min(0) }).optional(),
 });
 
@@ -170,7 +170,7 @@ export const visitsRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   });
 
-/** Dr.Claude 訊息裡的看診草稿存好了：記下存成哪一筆（只能動自己的對話） */
+/** Dr.水獺 訊息裡的看診草稿存好了：記下存成哪一筆（只能動自己的對話） */
 async function markDraftSaved(db: D1Database, email: string, messageId: number, index: number, visitId: number) {
   const row = await first<{ actions: string }>(
     db,

@@ -63,7 +63,7 @@ SLOT_LABEL = {"morning": "早上", "noon": "中午", "evening": "晚上", "bedti
 KIND_LABEL = {"temperature": "體溫 °C", "weight": "體重 kg", "height": "身高 cm", "heart_rate": "心跳 下/分",
               "blood_pressure": "血壓 mmHg（value 收縮壓、value2 舒張壓）", "spo2": "血氧 %"}
 
-SYSTEM_PROMPT = """你是「Dr.Claude」，Nathan 家的家庭健康小幫手，在家庭醫生 App 裡用一隻海獺醫生的 3D 角色出現。
+SYSTEM_PROMPT = """你是「Dr.水獺」，Nathan 家的家庭健康小幫手，在家庭醫生 App 裡用一隻海獺醫生的 3D 角色出現。
 使用的人是 Nathan 和太太，以及他們幫兩個小女兒（雙胞胎）問問題。回答一律用繁體中文（台灣用語），像一位溫暖、講重點的家醫科醫師朋友。
 
 你能做的：
@@ -305,7 +305,7 @@ def build_prompt(ctx: dict, files: dict[int, Path]) -> str:
     conv = ctx.get("conversation") or {"messages": []}
     parts.append("# 對話（最後一則是現在要回覆的）")
     for m in conv["messages"]:
-        who = "家人" if m["role"] == "user" else "Dr.Claude"
+        who = "家人" if m["role"] == "user" else "Dr.水獺"
         att = [files[a] for a in m.get("attachmentIds", []) if a in files]
         att_text = "（附圖：" + "、".join(str(p) for p in att) + "，用 Read 看）" if att else ""
         parts.append(f"[{m['createdAt']}] {who}：{m['body']}{att_text}")
@@ -805,12 +805,12 @@ def handle(cfg: dict[str, str], platform: Platform, job: dict) -> str:
         try:
             collector, result = asyncio.run(asyncio.wait_for(run_agent(cfg, platform, ctx, files, job_dir), timeout))
         except asyncio.TimeoutError:
-            platform.fail(job_id, "Dr.Claude 想太久了（超過時間上限），請再試一次或把問題講短一點")
+            platform.fail(job_id, "Dr.水獺 想太久了（超過時間上限），請再試一次或把問題講短一點")
             return "失敗（逾時）"
         cost = result.get("cost")
         if result["subtype"] not in ("success",):
             note = "花費到上限" if "budget" in str(result["subtype"]) else result["subtype"]
-            platform.fail(job_id, f"Dr.Claude 這次沒有回完（{note}），請再試一次")
+            platform.fail(job_id, f"Dr.水獺 這次沒有回完（{note}），請再試一次")
             return f"失敗（{note}）"
         platform.progress(job_id, "writing")
         if ctx["job"]["kind"] == "rx_scan":
@@ -821,7 +821,7 @@ def handle(cfg: dict[str, str], platform: Platform, job: dict) -> str:
         else:
             reply = result["text"]
             if not reply:
-                platform.fail(job_id, "Dr.Claude 沒有寫出回覆，請再試一次")
+                platform.fail(job_id, "Dr.水獺 沒有寫出回覆，請再試一次")
                 return "失敗（沒有回覆）"
             payload = {"reply": reply, "mood": collector.mood, "actions": collector.actions, "costUsd": cost}
         status, body = platform.complete(job_id, payload)
@@ -838,7 +838,7 @@ def handle(cfg: dict[str, str], platform: Platform, job: dict) -> str:
             return f"失敗（送出 {status}）"
         return f"完成（US${cost or 0:.3f}，記錄 {len(payload.get('actions', []))} 筆）"
     except Exception as e:  # noqa: BLE001
-        platform.fail(job_id, f"Dr.Claude 服務出了問題：{e}")
+        platform.fail(job_id, f"Dr.水獺 服務出了問題：{e}")
         return f"失敗（{type(e).__name__}: {e}）"
     finally:
         shutil.rmtree(job_dir, ignore_errors=True)

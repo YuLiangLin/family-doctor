@@ -36,15 +36,16 @@ export function deviceLabel(ua: string | undefined): string {
   return [os, browser].filter(Boolean).join(' ') || '其他裝置';
 }
 
-/** 發一張新的登入憑證給這個帳號（Access 驗過是誰之後才會呼叫） */
-export async function createSession(c: Context<AppEnv>, email: string): Promise<void> {
+/** 發一張新的登入憑證給這個帳號（Access 驗過是誰之後才會呼叫）；loginEmail＝用別的登入信箱登入時是哪一個 */
+export async function createSession(c: Context<AppEnv>, email: string, loginEmail = ''): Promise<void> {
   const token = randomToken();
   const now = new Date();
   await run(
     c.env.DB,
-    `INSERT INTO user_sessions (token_hash, user_email, device, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO user_sessions (token_hash, user_email, login_email, device, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     await sha256Hex(token),
     email,
+    loginEmail,
     deviceLabel(c.req.header('User-Agent')),
     taipeiNow(now),
     taipeiNow(now),
@@ -100,6 +101,19 @@ export async function revokeCurrentSession(c: Context<AppEnv>): Promise<void> {
     );
   }
   deleteCookie(c, SESSION_COOKIE, { path: '/api', secure: true });
+}
+
+/** 拿掉一個登入信箱：只登出用它登入的裝置 */
+export async function revokeLoginEmailSessions(db: D1Database, loginEmail: string, by: string): Promise<number> {
+  const now = taipeiNow();
+  return run(
+    db,
+    'UPDATE user_sessions SET revoked_at = ?, revoked_by = ? WHERE login_email = ? AND revoked_at IS NULL AND expires_at > ?',
+    now,
+    by,
+    loginEmail,
+    now,
+  );
 }
 
 /** 撤銷一個帳號在所有裝置的登入憑證（「登出所有裝置」、停用、刪除）；回傳撤銷了幾台（已經過期的不算） */

@@ -1,4 +1,4 @@
-// Dr.Claude 對話與讀藥袋：人在這裡送出，家裡的 runner 經 /api/agent 領走處理（agent.ts）
+// Dr.水獺 對話與讀藥袋：人在這裡送出，家裡的 runner 經 /api/agent 領走處理（agent.ts）
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AiJob, Conversation, ConversationDetail, VisitDraft } from '../../shared/apiTypes';
@@ -149,14 +149,14 @@ export const chatRoutes = new Hono<AppEnv>()
     await run(c.env.DB, 'UPDATE conversations SET archived_at = ? WHERE id = ?', taipeiNow(), conv.id);
     return c.json({ ok: true });
   })
-  // 問 Dr.Claude：存訊息、排一件工作給 runner；同一段對話一次只能有一件在處理
+  // 問 Dr.水獺：存訊息、排一件工作給 runner；同一段對話一次只能有一件在處理
   .post('/conversations/:id/messages', async (c) => {
     const email = c.get('user').email;
     const conv = await myConversation(c.env.DB, parseId(c.req.param('id')), email);
     const b = await parseBody(c, messageSchema);
     if (!b.body && b.attachmentIds.length === 0) fail(400, '請輸入想問的內容');
     const busy = await first(c.env.DB, `SELECT 1 FROM ai_jobs WHERE conversation_id = ? AND status IN ('queued', 'running')`, conv.id);
-    if (busy) fail(409, 'Dr.Claude 還在回上一則，等他回完再問');
+    if (busy) fail(409, 'Dr.水獺 還在回上一則，等他回完再問');
     await checkAttachments(c.env.DB, b.attachmentIds, email);
     await checkDailyLimit(c.env, email);
     const now = taipeiNow();

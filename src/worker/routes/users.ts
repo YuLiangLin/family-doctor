@@ -6,7 +6,7 @@ import { isSuperAdmin } from '../auth';
 import { all, first, run } from '../db';
 import type { AppEnv } from '../env';
 import { fail, parseBody, requireSuperAdmin, zText } from '../http';
-import { revokeUserSessions } from '../sessions';
+import { revokeLoginEmailSessions, revokeUserSessions } from '../sessions';
 
 interface Row {
   email: string;
@@ -25,6 +25,15 @@ const userSchema = z.object({
   memberId: z.number().int().positive().nullable().default(null),
 });
 
+const emailSchema = z.object({ email: z.string().trim().toLowerCase().email('Email 格式不對').max(200) });
+
+/** 這個信箱已經被用掉了嗎（名單上的人，或某人的登入信箱）；回傳錯誤訊息 */
+async function emailTaken(db: D1Database, email: string): Promise<string | null> {
+  if (await first(db, 'SELECT 1 FROM users WHERE email = ?', email)) return '這個 email 已經在名單上了';
+  const alias = await first<{ user_email: string }>(db, 'SELECT user_email FROM user_emails WHERE email = ?', email);
+  return alias ? `這個 email 已經是 ${alias.user_email} 的登入信箱` : null;
+}
+
 const patchSchema = z.object({
   name: zText(40).optional(),
   role: z.enum(['admin', 'member']).optional(),
@@ -35,10 +44,12 @@ const patchSchema = z.object({
 /**
  * 帳號（能登入的 Google email 白名單）：清單大家看得到（設定頁顯示誰能用），只有最高管理者能新增、修改。
  * 自己可以改自己是哪位家人（PATCH /users/me）。
+ * 一個人可以有好幾個登入信箱（user_emails，例：公司的 Google 帳號）：只有最高管理者能加、拿掉。
  */
 export const usersRoutes = new Hono<AppEnv>()
   .get('/', async (c) => {
     const rows = await all<Row>(c.env.DB, 'SELECT * FROM users ORDER BY active DESC, created_at');
+    const aliases = await all<{ email: string; user_email: string }>(c.env.DB, 'SELECT email, user_email FROM user_emails ORDER BY created_at, email');
     const list: UserRow[] = rows.map((r) => ({
       email: r.email,
       name: r.name,
@@ -48,13 +59,15 @@ export const usersRoutes = new Hono<AppEnv>()
       picture: r.picture_url,
       lastSeenAt: r.last_seen_at,
       superAdmin: isSuperAdmin(c.env, r.email, r.role),
+      emails: aliases.filter((a) => a.user_email === r.email).map((a) => a.email),
     }));
     return c.json(list);
   })
   .post('/', async (c) => {
     requireSuperAdmin(c);
     const b = await parseBody(c, userSchema);
-    if (await first(c.env.DB, 'SELECT 1 FROM users WHERE email = ?', b.email)) fail(409, '這個 email 已經在名單上了');
+    const taken = await emailTaken(c.env.DB, b.email);
+    if (taken) fail(409, taken);
     const now = taipeiNow();
     await run(
       c.env.DB,
@@ -68,6 +81,27 @@ export const usersRoutes = new Hono<AppEnv>()
       c.get('user').email,
     );
     return c.json({ ok: true }, 201);
+  })
+  // 加一個登入信箱（例：公司的 Google 帳號）。Cloudflare Access 的「家人」政策也要加這個信箱才登得進來（部署指南 §2）
+  .post('/:email/emails', async (c) => {
+    requireSuperAdmin(c);
+    const owner = decodeURIComponent(c.req.param('email')).toLowerCase();
+    const { email } = await parseBody(c, emailSchema);
+    if (!(await first(c.env.DB, 'SELECT 1 FROM users WHERE email = ?', owner))) fail(404, '找不到這個帳號');
+    const taken = await emailTaken(c.env.DB, email);
+    if (taken) fail(409, taken);
+    await run(c.env.DB, 'INSERT INTO user_emails (email, user_email, created_at, created_by) VALUES (?, ?, ?, ?)', email, owner, taipeiNow(), c.get('user').email);
+    return c.json({ ok: true }, 201);
+  })
+  // 拿掉一個登入信箱：用它登入的裝置一起登出
+  .post('/:email/emails/remove', async (c) => {
+    requireSuperAdmin(c);
+    const owner = decodeURIComponent(c.req.param('email')).toLowerCase();
+    const { email } = await parseBody(c, emailSchema);
+    const n = await run(c.env.DB, 'DELETE FROM user_emails WHERE email = ? AND user_email = ?', email, owner);
+    if (n === 0) fail(404, '找不到這個登入信箱');
+    await revokeLoginEmailSessions(c.env.DB, email, c.get('user').email);
+    return c.json({ ok: true });
   })
   .patch('/me', async (c) => {
     const b = await parseBody(c, z.object({ memberId: z.number().int().positive().nullable(), name: zText(40).optional() }));

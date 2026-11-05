@@ -2,7 +2,7 @@
  * 家庭醫生 v0.2 設計系統
  *
  * 概念：「家裡的診間」。底色是溫暖的紙，主色是台灣藥袋的藍；介面用印刷體（Inter＋Noto Sans TC），
- * 只有 Dr.Claude 說的話用手寫體（霞鶩文楷）。招牌動作只有一個：打勾吃藥時，那一格被原子筆圈起來、打個勾。
+ * 只有 Dr.水獺 說的話用手寫體（霞鶩文楷）。招牌動作只有一個：打勾吃藥時，那一格被原子筆圈起來、打個勾。
  *
  * 版面：手機（< 960px）底部分頁列；電腦（≥ 960px）左側選單，≥ 1180px 各頁變兩欄。
  * 主題：跟系統，或在設定頁手動選亮色／暗色（html[data-theme]）。暗色的 token 寫兩次（系統暗色、手動暗色），改的時候兩邊一起改。
@@ -53,10 +53,16 @@
   --hero-a: #2a5fd4;
   --hero-b: #1c45a6;
 
-  /* Dr.Claude 診間 */
+  /* Dr.水獺 診間 */
   --stage-a: #ffffff;
   --stage-b: #ece8df;
   --floor: rgba(27, 34, 48, 0.07);
+  --la-water-a: #a9d6f1;
+  --la-water-b: #d3eaf8;
+  --la-water-front: #8cc4e8;
+  --la-ripple: rgba(255, 255, 255, 0.95);
+  --la-whisker: #c8b7a3;
+  --login-sea: #e4eff6;
 
   --shadow-1: 0 1px 2px rgba(27, 34, 48, 0.05), 0 0 0 1px rgba(27, 34, 48, 0.02);
   --shadow-2: 0 1px 2px rgba(27, 34, 48, 0.04), 0 10px 28px -14px rgba(27, 34, 48, 0.22);
@@ -114,6 +120,12 @@
     --stage-a: #1c2430;
     --stage-b: #0f141b;
     --floor: rgba(0, 0, 0, 0.35);
+    --la-water-a: #24577f;
+    --la-water-b: #1a3d5c;
+    --la-water-front: #2f6c9e;
+    --la-ripple: rgba(170, 210, 240, 0.6);
+    --la-whisker: #e9e3da;
+    --login-sea: #0f1b27;
     --shadow-1: 0 0 0 1px rgba(255, 255, 255, 0.015);
     --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 30px -16px rgba(0, 0, 0, 0.7);
     --shadow-3: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 30px 80px -20px rgba(0, 0, 0, 0.8);
@@ -153,6 +165,12 @@
   --stage-a: #1c2430;
   --stage-b: #0f141b;
   --floor: rgba(0, 0, 0, 0.35);
+  --la-water-a: #24577f;
+  --la-water-b: #1a3d5c;
+  --la-water-front: #2f6c9e;
+  --la-ripple: rgba(170, 210, 240, 0.6);
+  --la-whisker: #e9e3da;
+  --login-sea: #0f1b27;
   --shadow-1: 0 0 0 1px rgba(255, 255, 255, 0.015);
   --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 30px -16px rgba(0, 0, 0, 0.7);
   --shadow-3: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 30px 80px -20px rgba(0, 0, 0, 0.8);
@@ -3457,6 +3475,87 @@ a.entry:hover {
   max-width: 46%;
 }
 
+/* 其他登入信箱（設定頁「能登入的帳號」） */
+.set-row .grow > .login-emails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.email-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 3px 0 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-chip > .i {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--text-3);
+}
+
+.email-chip button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.email-chip button:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.email-chip button .i {
+  width: 12px;
+  height: 12px;
+}
+
+.email-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--primary-ink);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.email-add:hover {
+  background: var(--primary-soft);
+  border-style: solid;
+}
+
+.email-add .i {
+  width: 13px;
+  height: 13px;
+}
+
 .foot-note {
   text-align: center;
   color: var(--text-3);
@@ -3466,58 +3565,156 @@ a.entry:hover {
 }
 
 /* ======================================================================
-   登入
+   登入（海獺浮在水上＋卡片；手機上下排、電腦左右排）
    ====================================================================== */
 
 .login {
   min-height: 100dvh;
   display: grid;
-  place-items: center;
-  padding: 32px 20px;
+  grid-template-columns: minmax(0, 400px);
+  justify-content: center;
+  align-content: center;
+  padding: calc(var(--safe-t) + 20px) 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
   background:
-    radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 70%),
-    var(--bg);
+    radial-gradient(90% 50% at 50% 0%, color-mix(in srgb, var(--primary) 9%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--bg) 35%, var(--login-sea) 100%);
+}
+
+.login-hero {
+  position: relative;
+  width: min(260px, 72vw);
+  justify-self: center;
+  padding-top: 40px;
+  margin-bottom: -10px;
+  z-index: 1;
+}
+
+.login-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.login-say {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+  white-space: nowrap;
+  padding: 6px 14px 7px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  font-family: var(--font-hand);
+  font-size: 1rem;
+  line-height: 1.35;
+  color: var(--text);
+  transform-origin: 50% 100%;
+  animation: login-say-in 520ms 300ms var(--ease-out) both;
+}
+
+/* 泡泡的小尾巴，指著海獺 */
+.login-say::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 11px;
+  height: 11px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+@keyframes login-say-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+  }
 }
 
 .login-card {
+  position: relative;
   width: 100%;
-  max-width: 400px;
-  padding: 34px 28px 26px;
+  padding: 26px 24px 20px;
   border-radius: 28px;
   background: var(--surface);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-3);
+  animation: pop-in 420ms var(--ease-out) both;
+}
+
+.login-brand {
   text-align: center;
-  animation: pop-in 400ms var(--ease-out) both;
+  margin-bottom: 22px;
 }
 
-.login-card .logo {
-  width: 88px;
-  height: 88px;
-  border-radius: 28px;
-  margin: 0 auto 18px;
-  background: var(--otter-coat);
-  display: grid;
-  place-items: center;
-  box-shadow: 0 18px 30px -16px rgba(90, 50, 20, 0.7);
-}
-
-.login-card h1 {
+.login-brand h1 {
   font-size: 1.75rem;
   letter-spacing: 0.06em;
 }
 
-.login-card .lead {
-  margin-top: 8px;
+.login-brand .lead {
+  margin-top: 6px;
+  text-wrap: balance;
   color: var(--text-2);
   font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.login-card .alert {
+  text-align: left;
+}
+
+/* Google 登入鈕（照 Google 的樣式：白底、細框、彩色 G） */
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  height: 54px;
+  border-radius: 16px;
+  border: 1px solid #dadce0;
+  background: #ffffff;
+  color: #1f1f1f;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.12), 0 2px 6px -2px rgba(60, 64, 67, 0.15);
+  transition:
+    box-shadow 160ms var(--ease-out),
+    transform 160ms var(--ease-out),
+    background 160ms;
+}
+
+.google-btn:hover {
+  background: #f8fafd;
+  box-shadow: 0 2px 4px rgba(60, 64, 67, 0.15), 0 8px 18px -6px rgba(60, 64, 67, 0.25);
+}
+
+.google-btn:active {
+  transform: scale(0.985);
+}
+
+.google-btn svg {
+  width: 21px;
+  height: 21px;
+  flex: none;
 }
 
 .features {
   display: grid;
-  gap: 2px;
-  margin: 24px 0 26px;
-  text-align: left;
+  gap: 4px;
+  margin: 22px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px dashed var(--line-strong);
 }
 
 .features li {
@@ -3525,15 +3722,23 @@ a.entry:hover {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 9px 4px;
+  padding: 7px 2px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+
+.features li strong {
+  display: block;
   font-size: 0.9375rem;
-  color: var(--text-2);
+  font-weight: 600;
+  color: var(--text);
 }
 
 .features .ic {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
   display: grid;
   place-items: center;
   background: var(--tint, var(--primary-soft));
@@ -3547,13 +3752,168 @@ a.entry:hover {
 }
 
 .login-card .fine {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   margin-top: 14px;
   font-size: 0.8125rem;
   color: var(--text-3);
 }
 
+.login-card .fine .i {
+  width: 14px;
+  height: 14px;
+}
+
+.login-foot {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+}
+
+/* 插圖動畫：漂、眨眼、漣漪、額鏡反光 */
+.la-bob {
+  animation: la-bob 3.6s ease-in-out infinite;
+}
+
+@keyframes la-bob {
+  50% {
+    transform: translateY(-1.8px);
+  }
+}
+
+.la-eyes {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: la-blink 5.2s infinite;
+}
+
+@keyframes la-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.12);
+  }
+}
+
+.la-ripple {
+  fill: none;
+  stroke: var(--la-ripple);
+  stroke-width: 0.7;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  opacity: 0;
+  animation: la-ripple 4.2s ease-out infinite;
+}
+
+.la-ripple.r2 {
+  animation-delay: 1.4s;
+}
+
+.la-ripple.r3 {
+  animation-delay: 2.8s;
+}
+
+@keyframes la-ripple {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.la-glint {
+  opacity: 0.35;
+  animation: la-glint 6s ease-in-out infinite;
+}
+
+@keyframes la-glint {
+  0%,
+  78%,
+  100% {
+    opacity: 0.35;
+  }
+  86% {
+    opacity: 1;
+  }
+}
+
+.la-shine {
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-art *,
+  .login-say {
+    animation: none !important;
+  }
+  .la-ripple {
+    opacity: 0.5;
+  }
+}
+
+/* 暗色：Google 鈕用 Google 的暗色版 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .google-btn {
+    background: #131314;
+    border-color: #8e918f;
+    color: #e3e3e3;
+    box-shadow: none;
+  }
+  :root:not([data-theme='light']) .google-btn:hover {
+    background: #1d1e20;
+  }
+}
+
+:root[data-theme='dark'] .google-btn {
+  background: #131314;
+  border-color: #8e918f;
+  color: #e3e3e3;
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .google-btn:hover {
+  background: #1d1e20;
+}
+
+/* 電腦：左邊海獺、右邊卡片 */
+@media (min-width: 900px) {
+  .login {
+    grid-template-columns: minmax(0, 480px) minmax(0, 410px);
+    grid-template-rows: auto auto;
+    column-gap: clamp(40px, 6vw, 96px);
+    align-items: center;
+    padding: 48px;
+  }
+  .login-hero {
+    grid-row: 1 / span 2;
+    width: 100%;
+    padding-top: 56px;
+    margin: 0;
+  }
+  .login-say {
+    font-size: 1.25rem;
+    padding: 8px 16px 9px;
+  }
+  .login-card {
+    padding: 32px 30px 24px;
+  }
+  .login-foot {
+    grid-column: 2;
+  }
+}
+
 /* ======================================================================
-   Dr.Claude
+   Dr.水獺
    ====================================================================== */
 
 .doctor {
@@ -3669,7 +4029,7 @@ a.entry:hover {
   color: var(--on-primary);
 }
 
-/* Dr.Claude 說的話（手寫體對話框） */
+/* Dr.水獺 說的話（手寫體對話框） */
 .say {
   position: absolute;
   left: 50%;

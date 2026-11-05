@@ -120,7 +120,7 @@ export default function DoctorPage() {
     }
     if (lastMsg.id <= lastSpoken.current) return;
     lastSpoken.current = lastMsg.id;
-    if (lastMsg.actions.length) emitDataChanged(); // Dr.Claude 幫忙記了東西：其他畫面重抓
+    if (lastMsg.actions.length) emitDataChanged(); // Dr.水獺 幫忙記了東西：其他畫面重抓
     if (speakOn && canSpeak()) {
       say(lastMsg.body);
     } else {
@@ -371,7 +371,7 @@ export default function DoctorPage() {
                 </div>
                 <p className="disclaimer">
                   <Icon.shield />
-                  Dr.Claude 看得到全家的看診、用藥和身體狀況紀錄。他不是醫師，回答僅供參考；緊急狀況請直接打 119。
+                  Dr.水獺 看得到全家的看診、用藥和身體狀況紀錄。他不是醫師，回答僅供參考；緊急狀況請直接打 119。
                 </p>
               </div>
             )}
@@ -384,12 +384,12 @@ export default function DoctorPage() {
             <ErrorBox error={detail.error} />
             {d?.messages.map((m) => <Bubble key={m.id} msg={m} convMemberId={d.conversation.memberId} onSpeak={say} />)}
             {pending && (
-              <div className="msg assistant" aria-label="Dr.Claude 正在回覆">
+              <div className="msg assistant" aria-label="Dr.水獺 正在回覆">
                 <div className="msg-from">
                   <span className="face">
                     <OtterFace size={20} />
                   </span>
-                  Dr.Claude
+                  Dr.水獺
                 </div>
                 <div className="bubble">
                   <span className="typing-bubble">
@@ -411,7 +411,7 @@ export default function DoctorPage() {
             )}
             {d?.pending?.status === 'failed' && (
               <Alert kind="error">
-                {d.pending.error || 'Dr.Claude 這次沒有回覆'}
+                {d.pending.error || 'Dr.水獺 這次沒有回覆'}
                 <div style={{ marginTop: 8 }}>
                   <button type="button" className="btn sm" onClick={() => act.run(() => api.post(`/chat/jobs/${d.pending!.id}/retry`, {})).then(detail.reload)}>
                     再試一次
@@ -489,7 +489,7 @@ export default function DoctorPage() {
                     ref={textRef}
                     rows={1}
                     value={text}
-                    placeholder={pending ? 'Dr.Claude 回完再問' : listening ? '說吧，我在聽…' : '問 Dr.Claude'}
+                    placeholder={pending ? 'Dr.水獺 回完再問' : listening ? '說吧，我在聽…' : '問 Dr.水獺'}
                     aria-label="訊息"
                     onChange={(e) => setText(e.target.value)}
                     onKeyDown={(e) => {
@@ -543,7 +543,7 @@ function VoicePad({
   onCamera: () => void;
   onSendPhotos: () => void;
 }) {
-  const hint = busy ? 'Dr.Claude 回覆中…' : playing ? 'Dr.Claude 說話中，按麥克風可以打斷他' : hasFiles ? '說說照片是什麼，或直接送出照片' : '按一下麥克風，說說哪裡不舒服';
+  const hint = busy ? 'Dr.水獺 回覆中…' : playing ? 'Dr.水獺 說話中，按麥克風可以打斷他' : hasFiles ? '說說照片是什麼，或直接送出照片' : '按一下麥克風，說說哪裡不舒服';
   return (
     <div>
       <div className={`voice-heard${!listening || !heard ? ' hint' : ''}`} aria-live="polite">
@@ -599,7 +599,7 @@ function Bubble({ msg, convMemberId, onSpeak }: { msg: ChatMessage; convMemberId
           <span className="face">
             <OtterFace size={20} />
           </span>
-          Dr.Claude
+          Dr.水獺
         </div>
       )}
       <div className="bubble">
@@ -703,7 +703,7 @@ function HistoryList({ activeId, onPick }: { activeId: number | null; onPick: (i
         ))}
       </div>
     );
-  if (list.data.length === 0) return <div className="empty small">還沒有跟 Dr.Claude 聊過</div>;
+  if (list.data.length === 0) return <div className="empty small">還沒有跟 Dr.水獺 聊過</div>;
   return (
     <div className="stack xs">
       {list.data.map((c) => {

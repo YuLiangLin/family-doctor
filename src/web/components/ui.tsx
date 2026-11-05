@@ -395,7 +395,7 @@ export function InkMark({ draw, seed = 0 }: { draw: boolean; seed?: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Dr.Claude 回覆：段落與條列（不吃 HTML，只認 - 條列、1. 編號、**粗體**）
+// Dr.水獺 回覆：段落與條列（不吃 HTML，只認 - 條列、1. 編號、**粗體**）
 // ---------------------------------------------------------------------------
 
 const LIST_RE = /^\s*(?:[-•*・]|\d{1,2}[.)、])\s+/;
@@ -802,7 +802,7 @@ export function SlotIcon({ slot }: { slot: Slot }) {
   return <Icon.moon />;
 }
 
-/** 2D 海獺頭（分頁列、側邊欄、沒有 WebGL 時；3D 在 Dr.Claude 頁）。App 圖示同一個臉：scripts/gen-icons.mjs */
+/** 2D 海獺頭（分頁列、側邊欄、沒有 WebGL 時；3D 在 Dr.水獺 頁）。App 圖示同一個臉：scripts/gen-icons.mjs */
 export function OtterFace({ size = 34 }: { size?: number }) {
   const fill = `of${useId().replace(/:/g, '')}`;
   return (

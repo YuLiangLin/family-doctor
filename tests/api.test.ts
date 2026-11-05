@@ -9,6 +9,7 @@ import type {
   MemberDetail,
   TimelineItem,
   TodayResponse,
+  UserRow,
   VisitDetail,
   VisitDraft,
 } from '../src/shared/apiTypes';
@@ -127,6 +128,31 @@ describe('登入白名單', () => {
     expect((await call('POST', '/agent/jobs/claim', { as: 'agent:unknown', body: {} })).status).toBe(403);
     expect(agentMayCall('POST', 'http://x/api/agent/jobs/3/complete')).toBe(true);
     expect(agentMayCall('POST', 'http://x/api/agent/members')).toBe(false);
+  });
+
+  it('一個人可以有好幾個登入信箱：登入後算本人；只有最高管理者能加、拿掉；拿掉就進不來', async () => {
+    const WORK = 'mom.work@corp.test';
+    await seed();
+    expect((await call('POST', `/users/${encodeURIComponent(MOM)}/emails`, { as: MOM, body: { email: WORK } })).status).toBe(403);
+    expect((await call('POST', `/users/${encodeURIComponent(MOM)}/emails`, { body: { email: ' Mom.Work@Corp.test ' } })).status).toBe(201);
+    // 重複、跟名單上的人撞、新增帳號時用到別人的登入信箱都不行
+    expect((await call('POST', `/users/${encodeURIComponent(MOM)}/emails`, { body: { email: WORK } })).status).toBe(409);
+    expect((await call('POST', `/users/${encodeURIComponent(MOM)}/emails`, { body: { email: ADMIN } })).status).toBe(409);
+    expect((await call('POST', '/users', { body: { email: WORK } })).status).toBe(409);
+    expect((await call('POST', `/users/${encodeURIComponent('ghost@test.com')}/emails`, { body: { email: 'x@corp.test' } })).status).toBe(404);
+    const users = await call<UserRow[]>('GET', '/users');
+    expect(users.json.find((u) => u.email === MOM)?.emails).toEqual([WORK]);
+    // 用公司信箱登入＝本人，紀錄也記在本人名下
+    const me = await call<Me>('GET', '/me', { as: WORK });
+    expect(me.status).toBe(200);
+    expect(me.json.email).toBe(MOM);
+    // 本人停用，公司信箱也進不來；恢復後拿掉登入信箱，一樣進不來
+    await call('PATCH', `/users/${encodeURIComponent(MOM)}`, { body: { active: false } });
+    expect((await call('GET', '/me', { as: WORK })).status).toBe(403);
+    await call('PATCH', `/users/${encodeURIComponent(MOM)}`, { body: { active: true } });
+    expect((await call('POST', `/users/${encodeURIComponent(MOM)}/emails/remove`, { body: { email: WORK } })).status).toBe(200);
+    expect((await call('GET', '/me', { as: WORK })).status).toBe(403);
+    expect((await call('POST', `/users/${encodeURIComponent(MOM)}/emails/remove`, { body: { email: WORK } })).status).toBe(404);
   });
 
   it('改資料只收 JSON（擋 CSRF）', async () => {

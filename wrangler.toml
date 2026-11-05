@@ -5,12 +5,9 @@ workers_dev = true
 # 預覽網址不受 Access 保護的風險 → 關掉
 preview_urls = false
 
-# 正式網址（Worker custom domain；DNS 與憑證由 Cloudflare 自動建立）。部署用的 API token 要有兩個網域的 Zone → Workers Routes → Edit。
-# 2026-11-05 搬到 Nathan 自己的網域 nathantw.com；舊網址先留著，畫面會把人轉到新網址（部署指南 §9）。
-routes = [
-  { pattern = "doctor.nathantw.com", custom_domain = true },
-  { pattern = "doctor.lottery-wangwang.com", custom_domain = true },
-]
+# 正式網址（Worker custom domain；DNS 與憑證由 Cloudflare 自動建立）。部署用的 API token 要有 Zone → Workers Routes → Edit。
+# 2026-11-05 從 doctor.lottery-wangwang.com 搬到 Nathan 自己的網域（部署指南 §9），舊網址已拿掉。
+routes = [{ pattern = "doctor.nathantw.com", custom_domain = true }]
 
 # 後台另外加的變數（例如 BOOTSTRAP_ADMINS）部署時不會被清掉
 keep_vars = true
@@ -41,8 +38,8 @@ bucket_name = "family-doctor-files"
 # 兩個值都不是機密。沒設或設錯 → API 一律拒絕（fail closed）。
 [vars]
 ACCESS_TEAM_DOMAIN = "https://nathantw.cloudflareaccess.com"
-# 部署指南 §2、§9：Access 應用程式的 AUD tag，每個網域一個應用程式，逗號分隔（舊網址「家庭醫生」、新網址「家庭醫生（nathantw.com）」）
-ACCESS_AUD = "8cb331382e4befde4617bd1df5bdb03813cb384ea817c1b066b96ea6d112c65f,cd69471fc417a3b29b213b6e0c16b78736cad16b606dc5046a71c3d586f7021f"
+# 部署指南 §2、§9：Access 應用程式「家庭醫生（nathantw.com）」的 AUD tag；以後再換網域，新舊兩個可以逗號分隔
+ACCESS_AUD = "cd69471fc417a3b29b213b6e0c16b78736cad16b606dc5046a71c3d586f7021f"
 # 最高管理者（逗號分隔）：只有他能新增、停用家人帳號
 SUPER_ADMINS = "yliang.lin@gmail.com"
 # 手機通知（Web Push）：公鑰貼這裡，私鑰是 Worker secret VAPID_PRIVATE_KEY（部署指南 §4）

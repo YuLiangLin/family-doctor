@@ -16,10 +16,10 @@
 2. **計算結果不存資料庫**：`medications` 只存醫生怎麼開；每天要吃什麼、吃了幾包由排程即時算。
 3. **日期**：資料庫與 API 一律 `YYYY-MM-DD`（台北日期）、時間 `YYYY-MM-DD HH:MM(:SS)`。「今天」只准用 `taipeiToday()`，時間戳用 `taipeiNow()`。
 4. **健康紀錄不硬刪**：看診、用藥、日記、量測打錯就作廢（`voided_*`，記誰、何時、原因）。打勾紀錄（`dose_logs`）可以刪。
-5. **登入 fail closed**（同二胎）：沒設 `ACCESS_TEAM_DOMAIN`／`ACCESS_AUD` 一律拒絕；`DEV_AUTH_EMAIL` 只在 localhost 生效；不在 `users` 名單一律 403。不要放寬。
+5. **登入 fail closed**（同二胎）：沒設 `ACCESS_TEAM_DOMAIN`／`ACCESS_AUD` 一律拒絕；`DEV_AUTH_EMAIL` 只在 localhost 生效；不在 `users` 名單（或 `user_emails` 綁給某人的登入信箱）一律 403。不要放寬。
    **API token**（`Authorization: Bearer fdt_…`，2026-11-05 Nathan 決定）：只有最高管理者 Google 登入後在設定頁建，最長一年、資料庫只存雜湊、可撤銷；
    帳號停用或不再是最高管理者就失效。只能走 `auth.ts` 的 `TOKEN_ROUTES`（read／log／write 一層包一層），不能管帳號、建 token、走 `/api/agent`。
-6. **Dr.Claude 的權限**：runner 只能走 `/api/agent` 的 `AGENT_ROUTES`（`auth.ts`）；人不能走 `/api/agent`。
+6. **Dr.Claude 的權限**（畫面上叫「Dr.水獺」，2026-11-05 Nathan 改名；程式、文件裡的 Dr.Claude 指同一個 AI 服務，給家人看的字一律寫 Dr.水獺）：runner 只能走 `/api/agent` 的 `AGENT_ROUTES`（`auth.ts`）；人不能走 `/api/agent`。
    runner 寫入只能經 `complete` 的 actions，由伺服器再檢查；**看診與用藥只能是草稿**，要人按確認。不要讓 App 裡的 AI 直接改用藥。
    例外（2026-11-05 Nathan 決定）：Claude Code 等程式用 API token（write）**照 Nathan 的指示**寫入，看診與用藥可以直接生效；
    `created_by` 等欄位記成 `token:<id>:<名稱>`，畫面標「經 API」（`ViaTag`）。
