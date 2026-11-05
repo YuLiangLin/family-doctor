@@ -3,6 +3,7 @@
 - chat：家人問 Dr.Claude 的問題 → 讀全家的健康紀錄、附圖 → 回覆；需要時幫忙記日記、量測，或整理成看診草稿
 - rx_scan：讀藥袋／收據照片 → 產出看診＋用藥草稿（人在畫面確認後才存）
 - 藥品照片（不經過 AI）：從食藥署（只限 mcp.fda.gov.tw）下載藥品外觀原圖 → 自動裁到藥丸、縮小 → 傳回系統存起來
+- 自動更新（不經過 AI）：每 5 分鐘看 GitHub 的 main 有沒有新版；有就快轉、裝套件、跑測試，過了才換新版重新啟動，沒過就退回原本那版
 
 AI 只能用這支程式提供的工具（記日記、記量測、提看診草稿、查更早的紀錄、設表情）和 Read（只讀這件工作的附圖）；
 沒有 Bash、不能上網。寫進系統的東西由這支程式送、伺服器再檢查一次；AI 拿不到服務憑證。
@@ -19,6 +20,7 @@ AI 只能用這支程式提供的工具（記日記、記量測、提看診草�
   FD_EFFORT                 選填，low／medium／high，預設 medium
   FD_MAX_BUDGET_USD         選填，一件的花費上限（美元，SDK 估算），預設 1.5
   FD_TIMEOUT_MIN            選填，一件最多幾分鐘，預設 6
+  FD_AUTO_UPDATE            選填，off＝不要自動更新（預設會：repo 在 main、沒有改過的檔案才更新）
 
 用法：
   .venv/bin/python runner.py --check     # 確認設定檔、服務憑證、API key
@@ -34,6 +36,7 @@ import json
 import os
 import shutil
 import signal
+import subprocess
 import sys
 import tempfile
 import time
@@ -531,6 +534,69 @@ def process_drug_photos(platform: "Platform", fetch=fetch_fda_image) -> int:
     return done
 
 
+# ---------- 自動更新（runner 程式自己做，不經過 AI） ----------
+
+REPO_DIR = HERE.parent.parent
+UPDATE_EVERY_SECONDS = 300
+RUNNER_PATH = "scripts/dr-claude-runner/"
+
+
+def _git(repo: Path, *args: str, timeout: int = 60) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, timeout=timeout,
+                          env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+
+
+def self_update(cfg: dict[str, str], repo: Path = REPO_DIR) -> bool:
+    """GitHub 的 main 有新版就更新；回傳要不要重新啟動（runner 自己的檔案有變才要）。
+    只在 repo 停在 main、沒有改過的檔案、可以快轉時才動；新版的測試沒過（或套件裝不起來）就退回原本那版。"""
+    if (cfg.get("FD_AUTO_UPDATE") or "on").strip().lower() in ("off", "0", "false", "no"):
+        return False
+    try:
+        if not (repo / ".git").exists() or _git(repo, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip() != "main":
+            return False
+        if _git(repo, "status", "--porcelain", "--untracked-files=no").stdout.strip():
+            log("自動更新：repo 裡有改過的檔案，先不更新")
+            return False
+        if _git(repo, "fetch", "--quiet", "origin", "main", timeout=120).returncode != 0:
+            log("⚠️ 自動更新：連不上 GitHub，等一下再試")
+            return False
+        old = _git(repo, "rev-parse", "HEAD").stdout.strip()
+        new = _git(repo, "rev-parse", "origin/main").stdout.strip()
+        if not new or old == new:
+            return False
+        if _git(repo, "merge-base", "--is-ancestor", old, new).returncode != 0:
+            log("⚠️ 自動更新：本機跟 GitHub 分岔了，不自動更新")
+            return False
+        changed = [f for f in _git(repo, "diff", "--name-only", old, new).stdout.split() if f.startswith(RUNNER_PATH)]
+        if _git(repo, "merge", "--ff-only", "--quiet", new).returncode != 0:
+            log("⚠️ 自動更新：快轉失敗")
+            return False
+        if not changed:
+            log(f"自動更新：程式更新到 {new[:7]}（runner 沒變，不用重新啟動）")
+            return False
+        runner_dir = repo / RUNNER_PATH
+        try:
+            if RUNNER_PATH + "requirements.txt" in changed:
+                subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "-r", str(runner_dir / "requirements.txt")],
+                               check=True, timeout=900, capture_output=True)
+            subprocess.run([sys.executable, "-m", "unittest", "-q", str(runner_dir / "test_runner.py")],
+                           check=True, timeout=300, capture_output=True, cwd=str(repo))
+        except (subprocess.SubprocessError, OSError) as e:
+            _git(repo, "reset", "--keep", old)
+            log(f"⚠️ 自動更新：新版 {new[:7]} 的測試或套件安裝沒過，退回 {old[:7]}（{type(e).__name__}）")
+            return False
+        log(f"自動更新：runner 更新到 {new[:7]}，重新啟動")
+        return True
+    except (subprocess.SubprocessError, OSError) as e:
+        log(f"⚠️ 自動更新失敗：{e}")
+        return False
+
+
+def restart_self() -> None:
+    """換成新版：同一個行程直接重新執行（systemd 看到的還是同一個服務）"""
+    os.execv(sys.executable, [sys.executable, *sys.argv])
+
+
 # ---------- 工具 ----------
 
 class Collector:
@@ -819,6 +885,14 @@ def check(cfg: dict[str, str], platform: Platform) -> bool:
     except OSError as e:
         log(f"✗ 連不上 Anthropic API：{e}")
         ok = False
+    if (cfg.get("FD_AUTO_UPDATE") or "on").strip().lower() in ("off", "0", "false", "no"):
+        log("⚠️ 自動更新關掉了（FD_AUTO_UPDATE=off）：程式改了要自己 git pull、重啟")
+    elif _git(REPO_DIR, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip() != "main":
+        log("⚠️ repo 沒有停在 main：不會自動更新")
+    elif _git(REPO_DIR, "ls-remote", "--exit-code", "origin", "main", timeout=60).returncode != 0:
+        log("⚠️ 連不到 GitHub（git ls-remote）：不會自動更新，檢查 gh auth login")
+    else:
+        log("✓ 自動更新：每 5 分鐘看 GitHub 的 main，有新版就更新、測試過了才換")
     for v in AUTH_VARS:
         if os.environ.get(v):
             log(f"⚠️ 環境變數 {v} 有值：服務只用設定檔的 FD_ANTHROPIC_API_KEY（會覆蓋掉），但請確認不是你不小心設的")
@@ -849,7 +923,12 @@ def main() -> None:
     signal.signal(signal.SIGINT, stop)
     log(f"Dr.Claude 服務啟動：{platform.base}")
     backoff = 5
+    last_update_check = 0.0
     while not stopping:
+        if not args.once and time.time() - last_update_check >= UPDATE_EVERY_SECONDS:
+            last_update_check = time.time()
+            if self_update(cfg):
+                restart_self()
         try:
             process_drug_photos(platform)
         except Exception as e:  # noqa: BLE001 — 照片出錯不能卡住 Dr.Claude

@@ -25,7 +25,8 @@
    `created_by` 等欄位記成 `token:<id>:<名稱>`，畫面標「經 API」（`ViaTag`）。
 7. **Dr.Claude 的安全底線**在 `runner.py` 的 `SYSTEM_PROMPT`：不診斷、危險徵兆直接叫就醫（mood urgent）、小孩劑量只照藥袋／仿單、不建議自行停藥。
    改提示時這幾條不能拿掉。runner 不給 Bash、不上網、不載入機器上的 Claude Code 設定。
-   （runner 程式本身會去食藥署下載藥品照片、裁切後傳回系統，只限 `mcp.fda.gov.tw`，不經過 AI；見部署指南 §7。）
+   （runner 程式本身會去食藥署下載藥品照片、裁切後傳回系統，只限 `mcp.fda.gov.tw`，不經過 AI；見部署指南 §7。
+   runner 也會自己從 GitHub 的 `main` 更新：`test_runner.py` 沒過就退回原版，所以改 runner 一定要讓測試能在家裡主機上跑過。）
 8. **個資不進 repo**：真實病歷、照片、資料庫匯出、`.dev.vars`、API key、服務憑證。測試與 e2e 只用假資料。
 9. 畫面文字用繁體中文；錯誤訊息要讓家人看得懂（`fail(400, '回診日不能早於看診日')`）。
 
