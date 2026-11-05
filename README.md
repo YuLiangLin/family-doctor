@@ -19,7 +19,7 @@
 | 用藥排程 | `src/shared/meds.ts`（前後端共用：今天吃什麼、療程第幾天、提醒） |
 | 登入 | Cloudflare Access（Google）＋ 系統自己的登入憑證；帳號白名單在 `users` 表 |
 | Dr.Claude | `scripts/dr-claude-runner/runner.py`（家裡 Linux，systemd 服務）↔ `/api/agent`（Access 服務憑證） |
-| 測試 | Vitest（排程、API，Node 內建 SQLite 模擬 D1）、Python unittest（runner）、Playwright 截圖冒煙測試 |
+| 測試 | Vitest（排程、API，Node 內建 SQLite 模擬 D1）、Python unittest（runner）、Playwright 截圖冒煙測試（手機與電腦寬度、亮暗色） |
 
 ## 常用指令
 
@@ -27,5 +27,5 @@
 npm ci
 npm run check        # 型別檢查 + 測試 + build（push 前跑）
 python3 -m unittest scripts/dr-claude-runner/test_runner.py
-bash scripts/e2e.sh  # 本機起 wrangler dev、建假資料、手機寬度截圖到 e2e-shots/
+bash scripts/e2e.sh  # 本機起 wrangler dev、建假資料、手機與電腦寬度截圖到 e2e-shots/
 ```

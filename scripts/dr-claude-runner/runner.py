@@ -10,7 +10,7 @@ AI 只能用這支程式提供的工具（記日記、記量測、提看診草�
 設定檔（預設 ~/.config/dr-claude/env，chmod 600，不要放進 repo）：
   FD_ANTHROPIC_API_KEY      Console 的 API key（專用 workspace、設每月上限）。
                             名稱故意不叫 ANTHROPIC_API_KEY：那會讓這台機器上的 Claude Code 改用 API key。
-  FD_AGENT_CLIENT_ID        Cloudflare Access 服務憑證（部署指南 §4；Client ID 結尾是 .access）
+  FD_AGENT_CLIENT_ID        Cloudflare Access 服務憑證（部署指南 §3；Client ID 結尾是 .access）
   FD_AGENT_CLIENT_SECRET
   FD_BASE_URL               選填，預設 https://doctor.lottery-wangwang.com
   FD_CHAT_MODEL             選填，對話用的模型，預設 claude-sonnet-5-5（快、便宜）
@@ -53,7 +53,7 @@ MAX_MESSAGE_BYTES = 64 * 1024 * 1024
 MAX_IMAGE_SIDE = 2000
 TOOL_PREFIX = "mcp__fd__"
 ACCESS_REJECTED = ("Cloudflare Access 不認得這組服務憑證：FD_AGENT_CLIENT_ID 要貼完整（含結尾的 .access）、"
-                   "SECRET 不能少字；或 Access 應用程式沒有 Service Auth 政策（部署指南 §4）")
+                   "SECRET 不能少字；或 Access 應用程式沒有 Service Auth 政策（部署指南 §3）")
 
 SLOT_LABEL = {"morning": "早上", "noon": "中午", "evening": "晚上", "bedtime": "睡前"}
 KIND_LABEL = {"temperature": "體溫 °C", "weight": "體重 kg", "height": "身高 cm", "heart_rate": "心跳 下/分",
@@ -105,7 +105,7 @@ def log(msg: str) -> None:
 def load_config(path: Path) -> dict[str, str]:
     """讀 KEY=VALUE 設定檔。只放在這個 dict，不放進 os.environ。"""
     if not path.exists():
-        sys.exit(f"找不到設定檔 {path}（見 docs/部署指南.md §4）")
+        sys.exit(f"找不到設定檔 {path}（見 docs/部署指南.md §3）")
     if path.stat().st_mode & 0o077:
         log(f"⚠️ {path} 別人讀得到，請 chmod 600 {path}")
     cfg: dict[str, str] = {}

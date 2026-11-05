@@ -85,3 +85,22 @@ export function speak(text: string, on: { start?: () => void; end?: () => void }
   speechSynthesis.speak(u);
   return () => speechSynthesis.cancel();
 }
+
+/**
+ * iPhone 的朗讀要在「使用者按了按鈕」那一刻先念過一次，之後 Dr.Claude 回覆時才能自動念出來。
+ * 打開語音對話／朗讀的那一下先念一個聽不到的空白。
+ */
+export function unlockSpeech() {
+  if (!canSpeak()) return;
+  try {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    speechSynthesis.speak(u);
+  } catch {
+    // 不支援就算了：回覆時按喇叭也能念
+  }
+}
+
+export function stopSpeaking() {
+  if (canSpeak()) speechSynthesis.cancel();
+}
