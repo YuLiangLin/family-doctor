@@ -36,9 +36,10 @@
   --on-primary: #ffffff;
   --pen: #2b3da6;
 
-  /* 水獺 */
-  --otter: #8a5a3b;
-  --otter-soft: #f5ebdf;
+  /* 海獺：深咖啡色身體、淺色頭（--otter-coat 是放海獺臉的底） */
+  --otter: #6b4b38;
+  --otter-soft: #f3ece3;
+  --otter-coat: radial-gradient(circle at 50% 30%, #6e5140, #3f2c22 72%);
 
   /* 狀態 */
   --green: #1f8257;
@@ -589,10 +590,10 @@ dd {
   width: 38px;
   height: 38px;
   border-radius: 12px;
-  background: var(--otter);
+  background: var(--otter-coat);
   display: grid;
   place-items: center;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06), 0 6px 14px -8px rgba(90, 50, 20, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06), 0 6px 14px -8px rgba(40, 26, 18, 0.6);
   flex: none;
 }
 
@@ -658,7 +659,7 @@ dd {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--otter);
+  background: var(--otter-coat);
   display: grid;
   place-items: center;
   flex: none;
@@ -803,12 +804,12 @@ dd {
   margin-top: -24px;
   margin-bottom: 1px;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 35%, #a06c49, var(--otter) 70%);
+  background: var(--otter-coat);
   display: grid;
   place-items: center;
   box-shadow:
     0 0 0 4px var(--bg),
-    0 10px 20px -8px rgba(90, 50, 20, 0.6);
+    0 10px 20px -8px rgba(40, 26, 18, 0.6);
   transition: transform 220ms var(--ease-out);
 }
 
@@ -820,7 +821,7 @@ dd {
   box-shadow:
     0 0 0 4px var(--bg),
     0 0 0 6px var(--primary),
-    0 10px 20px -8px rgba(90, 50, 20, 0.6);
+    0 10px 20px -8px rgba(40, 26, 18, 0.6);
 }
 
 /* ======================================================================
@@ -1937,7 +1938,7 @@ select.input,
   width: 64px;
   height: 64px;
   border-radius: 20px;
-  background: var(--otter);
+  background: var(--otter-coat);
   display: grid;
   place-items: center;
   animation: bob 1.6s ease-in-out infinite;
@@ -3268,7 +3269,7 @@ a.entry:hover {
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  background: var(--otter);
+  background: var(--otter-coat);
   display: grid;
   place-items: center;
   flex: none;
@@ -3495,7 +3496,7 @@ a.entry:hover {
   height: 88px;
   border-radius: 28px;
   margin: 0 auto 18px;
-  background: radial-gradient(circle at 50% 35%, #a06c49, var(--otter) 70%);
+  background: var(--otter-coat);
   display: grid;
   place-items: center;
   box-shadow: 0 18px 30px -16px rgba(90, 50, 20, 0.7);
@@ -3586,6 +3587,11 @@ a.entry:hover {
 
 .stage.compact {
   height: clamp(150px, 22dvh, 220px);
+}
+
+/* 3D 海獺浮在水上：不要地板影子 */
+.stage.water::after {
+  display: none;
 }
 
 .stage::after {
@@ -3845,7 +3851,7 @@ a.entry:hover {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--otter);
+  background: var(--otter-coat);
   display: grid;
   place-items: center;
 }
@@ -4028,7 +4034,7 @@ a.entry:hover {
 /* 輸入列 */
 .composer-wrap {
   flex: none;
-  /* 手機：下面留空間給分頁列中間凸起的水獺鈕 */
+  /* 手機：下面留空間給分頁列中間凸起的海獺鈕 */
   padding: 8px 12px 22px;
   background: linear-gradient(transparent, var(--bg) 30%);
 }

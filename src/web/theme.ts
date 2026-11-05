@@ -44,3 +44,24 @@ export function useTheme(): [ThemePref, (p: ThemePref) => void] {
     },
   ];
 }
+
+/** 現在畫面是不是暗色（跟著設定頁、系統切換；3D 角色的水、燈光用） */
+export function useIsDark(): boolean {
+  const get = () => {
+    const t = document.documentElement.dataset.theme;
+    return t ? t === 'dark' : systemDark();
+  };
+  const [dark, setDark] = useState(get);
+  useEffect(() => {
+    const on = () => setDark(get());
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    mq.addEventListener('change', on);
+    const mo = new MutationObserver(on);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => {
+      mq.removeEventListener('change', on);
+      mo.disconnect();
+    };
+  }, []);
+  return dark;
+}
