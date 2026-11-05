@@ -11,6 +11,12 @@
     <meta name="apple-mobile-web-app-title" content="家庭醫生" />
     <meta name="theme-color" content="#f5f3ee" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)" />
+    <!-- 2026-11-05 搬到 doctor.nathantw.com：舊網址打開畫面就轉過去（API 兩個網址都還能用；src/web/moved.ts、部署指南 §9） -->
+    <script>
+      if (location.hostname === 'doctor.lottery-wangwang.com') {
+        location.replace('https://doctor.nathantw.com' + location.pathname + (location.search ? location.search + '&' : '?') + 'moved=1' + location.hash);
+      }
+    </script>
     <!-- 設定頁選了亮色／暗色：畫面出來前先套用，不會閃一下（src/web/theme.ts） -->
     <script>
       try {

@@ -10,6 +10,8 @@ import { SettingsPage } from './pages/SettingsPage';
 import { TimelinePage } from './pages/TimelinePage';
 import { TodayPage } from './pages/TodayPage';
 import { VisitEditPage, VisitPage } from './pages/VisitPages';
+import { useInstallApp } from './installApp';
+import { useMovedNotice } from './moved';
 import { useNewRelease } from './version';
 
 // 3D 醫生（three.js）比較大，進 Dr.Claude 頁才載入
@@ -119,6 +121,7 @@ function Shell() {
               </div>
             </div>
           )}
+          {!full && <MovedNotice />}
           <Suspense
             fallback={
               full ? (
@@ -262,9 +265,43 @@ function TabBar({ onAdd }: { onAdd: () => void }) {
   );
 }
 
+/** 從舊網址轉過來的：提醒重新加到主畫面（src/web/moved.ts） */
+function MovedNotice() {
+  const [show, dismiss] = useMovedNotice();
+  const install = useInstallApp();
+  if (!show) return null;
+  const how = !install.offer
+    ? '之後請直接開這個網址。'
+    : install.platform === 'ios'
+      ? '請按 Safari 下方的「分享」→「加入主畫面」，再把舊的圖示刪掉。'
+      : '請按右上角「⋮」→「加到主畫面」，再把舊的圖示刪掉。';
+  return (
+    <div className="page wide">
+      <div className="release" role="status">
+        <Icon.download />
+        <div className="grow">
+          <strong>家庭醫生搬到新網址了</strong>
+          <span>
+            新網址是 doctor.nathantw.com，資料都在。{how}吃藥提醒有開的話，要在設定頁重新開一次。
+          </span>
+        </div>
+        {install.canPrompt && (
+          <button className="btn sm" onClick={() => void install.promptInstall()}>
+            安裝
+          </button>
+        )}
+        <button className="btn sm ghost" onClick={dismiss}>
+          知道了
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const tint = (bg: string, ink: string) => ({ ['--tint' as string]: bg, ['--tint-ink' as string]: ink }) as CSSProperties;
 
 function SignIn({ denied }: { denied?: string }) {
+  const [moved] = useMovedNotice();
   return (
     <div className="login">
       <div className="login-card">
@@ -310,10 +347,18 @@ function SignIn({ denied }: { denied?: string }) {
             </button>
           </div>
         ) : (
-          <a className="btn lg block" href={signInUrl()}>
-            <Icon.user />
-            用 Google 帳號登入
-          </a>
+          <div className="stack sm">
+            {moved && (
+              <div className="alert info" style={{ textAlign: 'left' }}>
+                <Icon.info />
+                <div>家庭醫生搬到新網址了，資料都在。請用 Google 帳號重新登入一次。</div>
+              </div>
+            )}
+            <a className="btn lg block" href={signInUrl()}>
+              <Icon.user />
+              用 Google 帳號登入
+            </a>
+          </div>
         )}
         <p className="fine">只有家人的帳號進得來</p>
       </div>
