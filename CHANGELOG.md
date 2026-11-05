@@ -2,6 +2,15 @@
 
 每一版開頭的 `> - ` 行是給家人看的更新內容（會顯示在「有新版本了」提醒裡）。
 
+## [0.5.1] - 2026-11-05
+
+> - 家庭醫生搬到新網址 doctor.nathantw.com，資料都在。開舊網址會自動轉過來；第一次要重新用 Google 登入，再把新網址加到主畫面、刪掉舊的圖示。
+
+- Nathan 買了自己的網域 `nathantw.com`：Worker 掛 `doctor.nathantw.com`，舊網址 `doctor.lottery-wangwang.com` 先留著（API 兩邊都能用）。
+- Access：新網域另外一個應用程式「家庭醫生（nathantw.com）」，`ACCESS_AUD` 可以放好幾個（逗號分隔）。加進原本的應用程式在新網域沒有生效；新網域的 Access 大約 40 分鐘後才開始擋。
+- 舊網址打開畫面就轉到新網址（`index.html`），新網址提醒重新加到主畫面（`src/web/moved.ts`）、登入頁提示重新登入。
+- runner、`fd-api.sh`、`VAPID_SUBJECT` 改用新網址。部署指南 §9。
+
 ## [0.5.0] - 2026-11-05
 
 > - Dr.Claude 換成海獺醫生：淺色毛茸茸的頭、亮亮的大黑鼻子，浮在水上，穿小白袍、戴額鏡、掛聽診器。
