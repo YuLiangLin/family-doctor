@@ -1,4 +1,5 @@
-// 用說的問、聽 Dr.Claude 回答：瀏覽器內建的語音辨識與朗讀（不送到其他服務；iPhone Safari、Android Chrome 都有）
+// 用說的問、聽 Dr.Claude 回答：瀏覽器內建的語音辨識與朗讀（iPhone Safari、Android Chrome 都有）。
+// 注意：語音轉文字是瀏覽器交給自家服務做的（Chrome → Google、iPhone → Apple），朗讀在裝置上做；我們的伺服器只收到轉好的文字。
 
 interface RecognitionLike {
   lang: string;
