@@ -46,7 +46,7 @@ ACCESS_AUD = "8cb331382e4befde4617bd1df5bdb03813cb384ea817c1b066b96ea6d112c65f"
 # 最高管理者（逗號分隔）：只有他能新增、停用家人帳號
 SUPER_ADMINS = "yliang.lin@gmail.com"
 # 手機通知（Web Push）：公鑰貼這裡，私鑰是 Worker secret VAPID_PRIVATE_KEY（部署指南 §4）
-VAPID_PUBLIC_KEY = ""
+VAPID_PUBLIC_KEY = "BM-Y8UtTtrLYt9Lt4NnAHE96FhpZWmM6RSyz_OIV1Mz2QU0ua7FJnhdlV7Z6GNXqH_-_36BQq2yhCAt3grhclHk"
 VAPID_SUBJECT = "https://doctor.nathantw.com"
 
 # 吃藥提醒（台北 08:00、12:30、18:30、21:30 = UTC 00:00、04:30、10:30、13:30），對應 src/shared/meds.ts 的 SLOTS
