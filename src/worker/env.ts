@@ -1,4 +1,4 @@
-import type { Role } from '../shared/apiTypes';
+import type { Role, TokenScope } from '../shared/apiTypes';
 
 export interface Env {
   DB: D1Database;
@@ -34,6 +34,11 @@ export interface CurrentUser {
   /** 家裡的 dr-claude-runner（服務憑證；只能走 /api/agent 的 AGENT_ROUTES） */
   agent: boolean;
   superAdmin: boolean;
+  /**
+   * 用 API token 登入時才有（auth.ts 的 TOKEN_ROUTES 限制能走的 API）。
+   * 這時 email 是 token:<id>:<名稱>（寫進 created_by 等欄位標記來源），ownerEmail 才是建 token 的帳號。
+   */
+  token?: { id: number; name: string; scope: TokenScope; ownerEmail: string };
 }
 
 export type AppEnv = {

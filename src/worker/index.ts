@@ -16,6 +16,7 @@ import { measurementsRoutes, notesRoutes, timelineRoutes, todayRoutes } from './
 import { dosesRoutes, medicationsRoutes } from './routes/medications';
 import { membersRoutes } from './routes/members';
 import { pushRoutes } from './routes/push';
+import { tokensRoutes } from './routes/tokens';
 import { usersRoutes } from './routes/users';
 import { visitsRoutes } from './routes/visits';
 import { revokeCurrentSession } from './sessions';
@@ -51,6 +52,7 @@ api.get('/me', (c) => {
 });
 api.route('/agent', agentRoutes);
 api.route('/users', usersRoutes);
+api.route('/tokens', tokensRoutes);
 api.route('/members', membersRoutes);
 api.route('/visits', visitsRoutes);
 api.route('/medications', medicationsRoutes);

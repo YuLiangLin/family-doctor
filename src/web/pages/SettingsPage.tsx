@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ROLE_LABEL, type PushSettings, type UserRow } from '../../shared/apiTypes';
 import { SLOT_INFO, SLOTS } from '../../shared/meds';
 import { api, signInUrl, signOutDevice } from '../api';
+import { ApiTokensSection } from '../components/ApiTokens';
 import { Alert, ErrorBox, Icon, Loading, PageHead, toast, UserAvatar } from '../components/ui';
 import { useAction, useApi, useSession } from '../hooks';
 import { isStandalone, platformOf } from '../installApp';
@@ -98,6 +99,7 @@ export function SettingsPage() {
         <PushSection />
         <InstallSection />
         {me.superAdmin && <UsersSection />}
+        {me.superAdmin && <ApiTokensSection />}
 
         <section className="card">
           <button

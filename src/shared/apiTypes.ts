@@ -7,6 +7,43 @@ export const ROLE_LABEL: Record<Role, string> = { admin: '管理者', member: '�
 /** AI 代理（家裡的 dr-claude-runner）的 email 前綴 */
 export const AGENT_PREFIX = 'agent:';
 
+// ---- API token（給 Claude Code 等程式用；migration 0002） ----
+
+/** read 唯讀；log 再加記身體狀況、量測、打勾；write 再加家人、看診、用藥 */
+export type TokenScope = 'read' | 'log' | 'write';
+export const TOKEN_SCOPE_LABEL: Record<TokenScope, string> = { read: '唯讀', log: '記日常', write: '完整寫入' };
+/** token 本身的開頭（Authorization: Bearer fdt_…） */
+export const API_TOKEN_PREFIX = 'fdt_';
+/** 最長一年 */
+export const API_TOKEN_MAX_DAYS = 365;
+/** 用 token 寫進去的紀錄，created_by 等欄位記成 token:<id>:<名稱> */
+export const TOKEN_ACTOR_PREFIX = 'token:';
+
+export const tokenActor = (id: number, name: string) => `${TOKEN_ACTOR_PREFIX}${id}:${name}`;
+
+/** created_by 是 API token 的話回傳 token 名稱，否則 null */
+export function tokenActorName(by: string | null | undefined): string | null {
+  const m = /^token:\d+:(.*)$/s.exec(by ?? '');
+  return m ? m[1] || 'API' : null;
+}
+
+export interface ApiToken {
+  id: number;
+  name: string;
+  /** 前幾碼，認得是哪一把 */
+  hint: string;
+  scope: TokenScope;
+  createdAt: string;
+  expiresAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+/** 建立時回傳一次的完整 token */
+export interface CreatedApiToken extends ApiToken {
+  token: string;
+}
+
 export interface Me {
   email: string;
   name: string;

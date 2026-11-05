@@ -17,12 +17,24 @@
 3. **日期**：資料庫與 API 一律 `YYYY-MM-DD`（台北日期）、時間 `YYYY-MM-DD HH:MM(:SS)`。「今天」只准用 `taipeiToday()`，時間戳用 `taipeiNow()`。
 4. **健康紀錄不硬刪**：看診、用藥、日記、量測打錯就作廢（`voided_*`，記誰、何時、原因）。打勾紀錄（`dose_logs`）可以刪。
 5. **登入 fail closed**（同二胎）：沒設 `ACCESS_TEAM_DOMAIN`／`ACCESS_AUD` 一律拒絕；`DEV_AUTH_EMAIL` 只在 localhost 生效；不在 `users` 名單一律 403。不要放寬。
+   **API token**（`Authorization: Bearer fdt_…`，2026-11-05 Nathan 決定）：只有最高管理者 Google 登入後在設定頁建，最長一年、資料庫只存雜湊、可撤銷；
+   帳號停用或不再是最高管理者就失效。只能走 `auth.ts` 的 `TOKEN_ROUTES`（read／log／write 一層包一層），不能管帳號、建 token、走 `/api/agent`。
 6. **Dr.Claude 的權限**：runner 只能走 `/api/agent` 的 `AGENT_ROUTES`（`auth.ts`）；人不能走 `/api/agent`。
-   runner 寫入只能經 `complete` 的 actions，由伺服器再檢查；**看診與用藥只能是草稿**，要人按確認。不要讓 AI 直接改用藥。
+   runner 寫入只能經 `complete` 的 actions，由伺服器再檢查；**看診與用藥只能是草稿**，要人按確認。不要讓 App 裡的 AI 直接改用藥。
+   例外（2026-11-05 Nathan 決定）：Claude Code 等程式用 API token（write）**照 Nathan 的指示**寫入，看診與用藥可以直接生效；
+   `created_by` 等欄位記成 `token:<id>:<名稱>`，畫面標「經 API」（`ViaTag`）。
 7. **Dr.Claude 的安全底線**在 `runner.py` 的 `SYSTEM_PROMPT`：不診斷、危險徵兆直接叫就醫（mood urgent）、小孩劑量只照藥袋／仿單、不建議自行停藥。
    改提示時這幾條不能拿掉。runner 不給 Bash、不上網、不載入機器上的 Claude Code 設定。
 8. **個資不進 repo**：真實病歷、照片、資料庫匯出、`.dev.vars`、API key、服務憑證。測試與 e2e 只用假資料。
 9. 畫面文字用繁體中文；錯誤訊息要讓家人看得懂（`fail(400, '回診日不能早於看診日')`）。
+
+## Claude Code 用 API token 進系統
+
+環境變數 `FD_API_TOKEN`（設定頁「API token」建的）在的話，可以用 `scripts/fd-api.sh GET /today` 這樣查正式系統。
+
+- 查問題用唯讀就夠；要寫入（家人、看診、用藥、身體狀況）**先把要寫的內容列給 Nathan 確認**再送，藥名、劑量、時段、天數照藥袋，小孩劑量不自己算。
+- 鐵則 7 的安全底線一樣適用：不診斷、危險徵兆叫就醫。
+- 讀到的健康資料只在對話裡用：不寫進 repo、commit、PR、issue，也不要把 token 印出來。
 
 ## 推送前自檢
 
