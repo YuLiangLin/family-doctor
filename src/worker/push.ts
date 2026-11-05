@@ -30,7 +30,7 @@ export interface SubscriptionRow {
 
 export function vapidKeys(env: Env): VapidKeys | null {
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return null;
-  return { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY, subject: env.VAPID_SUBJECT || 'https://doctor.lottery-wangwang.com' };
+  return { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY, subject: env.VAPID_SUBJECT || 'https://doctor.nathantw.com' };
 }
 
 const ACTIVE_USER = 'JOIN users u ON u.email = s.user_email AND u.active = 1';

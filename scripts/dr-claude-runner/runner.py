@@ -14,7 +14,7 @@ AI 只能用這支程式提供的工具（記日記、記量測、提看診草�
                             名稱故意不叫 ANTHROPIC_API_KEY：那會讓這台機器上的 Claude Code 改用 API key。
   FD_AGENT_CLIENT_ID        Cloudflare Access 服務憑證（部署指南 §3；Client ID 結尾是 .access）
   FD_AGENT_CLIENT_SECRET
-  FD_BASE_URL               選填，預設 https://doctor.lottery-wangwang.com
+  FD_BASE_URL               選填，預設 https://doctor.nathantw.com
   FD_CHAT_MODEL             選填，對話用的模型，預設 claude-sonnet-5-5（快、便宜）
   FD_SCAN_MODEL             選填，讀藥袋用的模型，預設 claude-opus-5-5（字跡、表格比較準）
   FD_EFFORT                 選填，low／medium／high，預設 medium
@@ -47,7 +47,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_ENV_FILE = Path("~/.config/dr-claude/env").expanduser()
-DEFAULT_BASE = "https://doctor.lottery-wangwang.com"
+DEFAULT_BASE = "https://doctor.nathantw.com"
 API_PREFIX = "/api/agent"
 USER_AGENT = "family-doctor-runner/1.0"  # Cloudflare 會擋 Python 預設的 User-Agent
 CLAIM_WAIT_SECONDS = 25
