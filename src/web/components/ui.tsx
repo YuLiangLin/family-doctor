@@ -802,27 +802,37 @@ export function SlotIcon({ slot }: { slot: Slot }) {
   return <Icon.moon />;
 }
 
-/** 2D 水獺頭（分頁列、側邊欄、沒有 WebGL 時；3D 在 Dr.Claude 頁） */
+/** 2D 海獺頭（分頁列、側邊欄、沒有 WebGL 時；3D 在 Dr.Claude 頁）。App 圖示同一個臉：scripts/gen-icons.mjs */
 export function OtterFace({ size = 34 }: { size?: number }) {
+  const fill = `of${useId().replace(/:/g, '')}`;
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" aria-hidden>
-      <circle cx="8.5" cy="17" r="3.2" fill="#6e4429" />
-      <circle cx="31.5" cy="17" r="3.2" fill="#6e4429" />
-      <circle cx="8.5" cy="17" r="1.5" fill="#c99a78" />
-      <circle cx="31.5" cy="17" r="1.5" fill="#c99a78" />
-      <ellipse cx="20" cy="21" rx="14" ry="12.5" fill="#8a5a3b" />
-      <ellipse cx="20" cy="26.5" rx="10" ry="6.5" fill="#f3e3cc" />
-      <circle cx="14.5" cy="19" r="2" fill="#1b1410" />
-      <circle cx="25.5" cy="19" r="2" fill="#1b1410" />
-      <circle cx="15.1" cy="18.4" r="0.65" fill="#fff" />
-      <circle cx="26.1" cy="18.4" r="0.65" fill="#fff" />
-      <ellipse cx="12" cy="23.2" rx="1.8" ry="1.1" fill="#f2a08a" opacity="0.55" />
-      <ellipse cx="28" cy="23.2" rx="1.8" ry="1.1" fill="#f2a08a" opacity="0.55" />
-      <ellipse cx="20" cy="23.5" rx="2.8" ry="1.8" fill="#2a1a12" />
-      <path d="M20 25.3v1.7M17.5 28c1.4 1 3.6 1 5 0" stroke="#2a1a12" strokeWidth="1" fill="none" strokeLinecap="round" />
-      <path d="M12 25.5h-5M12 27l-4.5 1.2M28 25.5h5M28 27l4.5 1.2" stroke="#3a2a20" strokeWidth="0.6" strokeLinecap="round" />
-      <circle cx="20" cy="10.5" r="3.4" fill="#e9eef5" stroke="#9aa9bd" strokeWidth="1" />
-      <circle cx="20" cy="10.5" r="1.2" fill="#9aa9bd" />
+      <defs>
+        <radialGradient id={fill} cx="50%" cy="38%" r="62%">
+          <stop offset="0" stopColor="#f8f4ec" />
+          <stop offset="1" stopColor="#d8cab6" />
+        </radialGradient>
+      </defs>
+      <circle cx="7" cy="15.2" r="2.5" fill="#8a735e" />
+      <circle cx="33" cy="15.2" r="2.5" fill="#8a735e" />
+      <path
+        d="M20 6.2c8.8 0 15.4 5 15.4 12.7 0 5-2.5 8.6-6.2 10.8-2.7 1.6-5.8 2.4-9.2 2.4s-6.5-.8-9.2-2.4C7.1 27.5 4.6 23.9 4.6 18.9 4.6 11.2 11.2 6.2 20 6.2z"
+        fill={`url(#${fill})`}
+      />
+      {/* 額鏡 */}
+      <path d="M5.6 14.4C9 10.6 14.2 8.8 20 8.8s11 1.8 14.4 5.6" stroke="#3b4a5e" strokeWidth="1" fill="none" strokeLinecap="round" />
+      <circle cx="26.2" cy="9.4" r="3.4" fill="#eef3f8" stroke="#9aa9bd" strokeWidth="0.9" />
+      <circle cx="26.2" cy="9.4" r="1" fill="#3b4a5e" />
+      {/* 鬍鬚墊（ω）、眼睛、鼻子 */}
+      <ellipse cx="17.3" cy="23.6" rx="3.3" ry="2.6" fill="#faf6ef" />
+      <ellipse cx="22.7" cy="23.6" rx="3.3" ry="2.6" fill="#faf6ef" />
+      <path d="M15.2 25c1.2 1.2 3.3 1.3 4.8.2 1.5 1.1 3.6 1 4.8-.2" stroke="#b09a86" strokeWidth="0.6" fill="none" strokeLinecap="round" />
+      <circle cx="14.5" cy="17.6" r="1.65" fill="#120d0b" />
+      <circle cx="25.5" cy="17.6" r="1.65" fill="#120d0b" />
+      <circle cx="15" cy="17" r="0.55" fill="#fff" />
+      <circle cx="26" cy="17" r="0.55" fill="#fff" />
+      <path d="M16 20.3c0-1.2 1.8-1.8 4-1.8s4 .6 4 1.8c0 1.5-2.2 3.2-4 3.2s-4-1.7-4-3.2z" fill="#1b1411" />
+      <ellipse cx="18.5" cy="19.6" rx="1.1" ry="0.45" fill="#fff" opacity="0.6" />
     </svg>
   );
 }

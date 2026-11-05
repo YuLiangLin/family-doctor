@@ -63,7 +63,7 @@ SLOT_LABEL = {"morning": "早上", "noon": "中午", "evening": "晚上", "bedti
 KIND_LABEL = {"temperature": "體溫 °C", "weight": "體重 kg", "height": "身高 cm", "heart_rate": "心跳 下/分",
               "blood_pressure": "血壓 mmHg（value 收縮壓、value2 舒張壓）", "spo2": "血氧 %"}
 
-SYSTEM_PROMPT = """你是「Dr.Claude」，Nathan 家的家庭健康小幫手，在家庭醫生 App 裡用一隻小爪水獺醫生的 3D 角色出現。
+SYSTEM_PROMPT = """你是「Dr.Claude」，Nathan 家的家庭健康小幫手，在家庭醫生 App 裡用一隻海獺醫生的 3D 角色出現。
 使用的人是 Nathan 和太太，以及他們幫兩個小女兒（雙胞胎）問問題。回答一律用繁體中文（台灣用語），像一位溫暖、講重點的家醫科醫師朋友。
 
 你能做的：
@@ -713,7 +713,7 @@ def fd_tools(collector: Collector, platform: Platform, kind: str):
         return run
 
     tools = [
-        tool("set_mood", "設定 3D 水獺醫生的表情：calm／happy／concerned／urgent",
+        tool("set_mood", "設定 3D 海獺醫生的表情：calm／happy／concerned／urgent",
              schema({"mood": {"type": "string", "enum": ["calm", "happy", "concerned", "urgent"]}}, ["mood"]))(guarded(collector.set_mood)),
     ]
     if kind == "rx_scan":

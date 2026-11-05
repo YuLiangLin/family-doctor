@@ -9,6 +9,7 @@ import { canUseWebGL } from '../doctor/webgl';
 import { dayLabel, hhmm } from '../format';
 import { emitDataChanged, useAction, useApi, usePoll, useSession } from '../hooks';
 import { uploadPhoto } from '../imageTools';
+import { useIsDark } from '../theme';
 import type { DraftState } from './VisitPages';
 
 const Otter3D = lazy(() => import('../doctor/Otter3D'));
@@ -63,6 +64,7 @@ export default function DoctorPage() {
   const lastSpoken = useRef<number>(0);
   const voiceRef = useRef(voice);
   const webgl = useMemo(canUseWebGL, []);
+  const dark = useIsDark();
   const reduceMotion = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, []);
   const speakOn = tts || voice;
 
@@ -122,7 +124,7 @@ export default function DoctorPage() {
     if (speakOn && canSpeak()) {
       say(lastMsg.body);
     } else {
-      // 沒朗讀：讓水獺「講」一下子
+      // 沒朗讀：讓海獺「講」一下子
       setSpeaking(true);
       const t = window.setTimeout(() => setSpeaking(false), Math.min(6000, 1200 + lastMsg.body.length * 25));
       return () => {
@@ -243,7 +245,7 @@ export default function DoctorPage() {
   return (
     <div className="doctor">
       <div className="doctor-side">
-        <div className={`stage${d?.messages.length ? ' compact' : ''}`}>
+        <div className={`stage${d?.messages.length ? ' compact' : ''}${webgl ? ' water' : ''}`}>
           <div className="stage-bar">
             <button type="button" className="icon-btn glass history-btn" aria-label="對話紀錄" onClick={() => setHistory(true)}>
               <Icon.history />
@@ -286,7 +288,7 @@ export default function DoctorPage() {
                   </div>
                 }
               >
-                <Otter3D state={otterState} mood={mood} reduceMotion={reduceMotion} />
+                <Otter3D state={otterState} mood={mood} reduceMotion={reduceMotion} dark={dark} />
               </Suspense>
             ) : (
               <div className="otter2d">
