@@ -2,6 +2,16 @@
 
 每一版開頭的 `> - ` 行是給家人看的更新內容（會顯示在「有新版本了」提醒裡）。
 
+## [0.4.1] - 2026-11-05
+
+> - 家裡的 Dr.Claude 主機會自己更新，不用再手動處理。
+
+- `runner.py` 的 `self_update`：每 5 分鐘 `git fetch` GitHub 的 `main`，有新版就快轉；runner 的檔案有變才裝套件（requirements 有變時）、
+  跑 `test_runner.py`，過了用 `os.execv` 換成新版，沒過就 `git reset --keep` 退回。repo 不在 `main`、有改過的檔案、分岔都不動。
+  `FD_AUTO_UPDATE=off` 可以關掉；`--check` 會顯示能不能自動更新。
+- 測試用暫時的 git repo 模擬 GitHub 與家裡的 clone（更新、不用重啟、測試沒過退回、有改過的檔案不動）。
+- 部署指南 §3-3、§7 改寫；`dr-claude.service` 的章節號修正。
+
 ## [0.4.0] - 2026-11-05
 
 > - 每種藥可以配上真實照片（食藥署的藥品外觀資料）：今天頁一眼看出要吃哪一顆，點開看大圖和大小。

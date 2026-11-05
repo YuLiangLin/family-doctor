@@ -260,3 +260,74 @@ class DrugPhotoTest(unittest.TestCase):
         ok = next(c for c in calls if c[1].startswith("/drug-photos/%E8%A1%9B"))
         self.assertEqual(ok[2]["sourceUrl"], "https://mcp.fda.gov.tw/a")
         self.assertTrue(ok[2]["cropped"])
+
+
+class SelfUpdateTest(unittest.TestCase):
+    """用暫時的 git repo 模擬 GitHub（origin）與家裡的 clone"""
+
+    def setUp(self):
+        import os
+        import subprocess
+
+        self.tmp = Path(tempfile.mkdtemp())
+        self.env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+        self.run = lambda *a, cwd: subprocess.run(a, cwd=cwd, env=self.env, check=True, capture_output=True)
+        self.origin = self.tmp / "origin.git"
+        self.run("git", "init", "--quiet", "--bare", "-b", "main", str(self.origin), cwd=self.tmp)
+        self.work = self.tmp / "work"
+        self.run("git", "clone", "--quiet", str(self.origin), str(self.work), cwd=self.tmp)
+        self.write(self.work, "scripts/dr-claude-runner/runner.py", "VERSION = 1\n")
+        self.write(self.work, "scripts/dr-claude-runner/test_runner.py", "import unittest\nclass T(unittest.TestCase):\n    def test_ok(self):\n        pass\n")
+        self.commit(self.work, "v1")
+        self.run("git", "push", "--quiet", "origin", "main", cwd=self.work)
+        self.home = self.tmp / "home"
+        self.run("git", "clone", "--quiet", str(self.origin), str(self.home), cwd=self.tmp)
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def write(self, repo, path, text):
+        f = repo / path
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(text)
+
+    def commit(self, repo, msg):
+        self.run("git", "add", "-A", cwd=repo)
+        self.run("git", "commit", "--quiet", "-m", msg, cwd=repo)
+
+    def push_change(self, path, text):
+        self.write(self.work, path, text)
+        self.commit(self.work, "change")
+        self.run("git", "push", "--quiet", "origin", "main", cwd=self.work)
+
+    def head(self):
+        import subprocess
+
+        return subprocess.run(["git", "-C", str(self.home), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+
+    def test_runner_change_updates_and_asks_restart(self):
+        self.push_change("scripts/dr-claude-runner/runner.py", "VERSION = 2\n")
+        self.assertTrue(runner.self_update({}, repo=self.home))
+        self.assertEqual((self.home / "scripts/dr-claude-runner/runner.py").read_text(), "VERSION = 2\n")
+        self.assertFalse(runner.self_update({}, repo=self.home))  # 已經是最新
+
+    def test_other_files_update_without_restart(self):
+        self.push_change("src/web/App.tsx", "// 畫面改了\n")
+        self.assertFalse(runner.self_update({}, repo=self.home))
+        self.assertTrue((self.home / "src/web/App.tsx").exists())
+
+    def test_failing_tests_roll_back(self):
+        before = self.head()
+        self.push_change("scripts/dr-claude-runner/test_runner.py", "import unittest\nclass T(unittest.TestCase):\n    def test_bad(self):\n        self.fail('壞掉')\n")
+        self.assertFalse(runner.self_update({}, repo=self.home))
+        self.assertEqual(self.head(), before)
+
+    def test_local_changes_or_off_skip(self):
+        before = self.head()
+        self.push_change("scripts/dr-claude-runner/runner.py", "VERSION = 2\n")
+        self.assertFalse(runner.self_update({"FD_AUTO_UPDATE": "off"}, repo=self.home))
+        self.write(self.home, "scripts/dr-claude-runner/runner.py", "VERSION = 'local'\n")
+        self.assertFalse(runner.self_update({}, repo=self.home))
+        self.assertEqual(self.head(), before)
