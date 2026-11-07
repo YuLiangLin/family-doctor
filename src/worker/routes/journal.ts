@@ -6,7 +6,7 @@ import { addDays, taipeiNow, taipeiToday } from '../../shared/dates';
 import { all, run, stmt } from '../db';
 import type { AppEnv } from '../env';
 import { fail, parseBody, parseId, zDateTime, zId, zRequiredText, zText } from '../http';
-import { loadDoseLogs, loadMeasurements, loadMedications, loadMembers, loadNotes, loadVisits, requireMember, runnerState } from '../records';
+import { loadDoseLogs, loadMeasurements, loadMedications, loadMembers, loadNotes, loadVisits, loadVisitsByIds, requireMember, runnerState } from '../records';
 
 const noteSchema = z.object({
   memberId: zId,
@@ -112,6 +112,7 @@ export const todayRoutes = new Hono<AppEnv>().get('/', async (c) => {
     date,
     members: await loadMembers(c.env.DB),
     medications,
+    visits: await loadVisitsByIds(c.env.DB, medications.map((m) => m.visitId)),
     doseLogs: await loadDoseLogs(c.env.DB, medications.map((m) => m.id)),
     followUps: followUps.map((f) => ({ visitId: f.id, memberId: f.member_id, date: f.follow_up_date, clinic: f.clinic })),
     runner: await runnerState(c.env.DB),

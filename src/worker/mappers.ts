@@ -142,6 +142,7 @@ export interface DoseLogRow {
   status: 'taken' | 'skipped';
   logged_at: string;
   logged_by: string;
+  taken_at: string;
 }
 
 export const toDoseLog = (r: DoseLogRow): DoseLog => ({
@@ -150,6 +151,7 @@ export const toDoseLog = (r: DoseLogRow): DoseLog => ({
   doseDate: r.dose_date,
   slot: r.slot,
   status: r.status,
+  takenAt: r.status === 'taken' ? r.taken_at || r.logged_at.slice(0, 16) : null,
   loggedAt: r.logged_at,
   loggedBy: r.logged_by,
 });

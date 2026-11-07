@@ -1,11 +1,11 @@
 // 手機通知：誰的哪幾台裝置、送什麼（協定在 webPush.ts，同二胎）。
-// 吃藥提醒：每個時段（shared/meds.ts 的 SLOTS）Cron 觸發一次，還沒打勾的藥推給全家帳號。
+// 吃藥提醒：每個時段（shared/meds.ts 的 SLOTS）Cron 觸發一次，還沒吃完的那幾包推給全家帳號。
 import type { Context } from 'hono';
 import { taipeiNow } from '../shared/dates';
-import { dosesOn, reminderText, SLOT_INFO, type Slot } from '../shared/meds';
+import { packLabel, packsOn, reminderText, SLOT_INFO, type Slot } from '../shared/meds';
 import { all, first, run } from './db';
 import type { AppEnv, Env } from './env';
-import { loadDoseLogs, loadMedications, loadMembers } from './records';
+import { loadDoseLogs, loadMedications, loadMembers, loadVisitsByIds } from './records';
 import { sendWebPush, type PushOptions, type VapidKeys } from './webPush';
 
 export interface PushMessage {
@@ -94,17 +94,25 @@ export async function inBackground(c: Context<AppEnv>, task: () => Promise<unkno
   }
 }
 
-/** 某天某個時段的提醒內容（還沒打勾的） */
+/** 某天某個時段的提醒內容（還沒吃完的那幾包；同一次看診的藥是一包） */
 export async function reminderMessage(env: Env, date: string, slot: Slot): Promise<PushMessage | null> {
   const meds = await loadMedications(env.DB, { activeOn: date });
   const logs = await loadDoseLogs(env.DB, meds.map((m) => m.id));
   const members = new Map((await loadMembers(env.DB)).map((m) => [m.id, m.name]));
-  const due = dosesOn(meds, logs, date).filter((d) => d.slot === slot);
+  const clinics = new Map((await loadVisitsByIds(env.DB, meds.map((m) => m.visitId))).map((v) => [v.id, v.clinic]));
+  const packs = packsOn(meds, logs, date).filter((p) => p.slot === slot && members.has(p.memberId));
   const text = reminderText(
     slot,
-    due
-      .filter((d) => members.has(d.memberId))
-      .map((d) => ({ memberName: members.get(d.memberId)!, medName: shortName(meds.find((m) => m.id === d.medicationId)!.name), done: !!d.mark })),
+    packs.map((p) => ({
+      memberName: members.get(p.memberId)!,
+      label: packLabel(
+        p,
+        p.visitId ? (clinics.get(p.visitId) ?? '') : '',
+        shortName(meds.find((m) => m.id === p.doses[0].medicationId)!.name),
+        packs.filter((x) => x.groupKey === p.groupKey).length > 1,
+      ),
+      done: p.status === 'taken' || p.status === 'skipped',
+    })),
   );
   return text ? { ...text, url: '/', tag: `dose-${date}-${slot}` } : null;
 }

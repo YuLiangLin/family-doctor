@@ -182,7 +182,7 @@ export const isAgentPath = (url: string) => /^\/api\/agent(\/|$)/.test(new URL(u
 /**
  * API token 能呼叫的 API（其他一律 403），依權限一層包一層：
  * - read 唯讀：今天、時間軸、家人、看診、用藥、附件、藥品資料與照片
- * - log 再加：記身體狀況、量測、打勾（含作廢、取消打勾）
+ * - log 再加：記身體狀況、量測、打勾（含作廢、取消打勾、改吃藥時間）
  * - write 再加：家人、看診、用藥（直接生效，created_by 記成 token:<id>:<名稱>，畫面標「經 API」）、用藥對照片、上傳附件
  * 都不能：管帳號（/users）、建 token（/tokens）、通知裝置（/push）、Dr.水獺 對話與讀藥袋（/chat、/scan）、移除家人、/api/agent。
  */
@@ -201,7 +201,7 @@ const TOKEN_ROUTES: Record<TokenScope, { method: string; path: RegExp }[]> = {
     { method: 'POST', path: /^\/api\/(notes|measurements)$/ },
     { method: 'POST', path: /^\/api\/(notes|measurements)\/\d+\/void$/ },
     { method: 'POST', path: /^\/api\/doses(\/clear)?$/ },
-    { method: 'POST', path: /^\/api\/doses\/\d+\/delete$/ },
+    { method: 'POST', path: /^\/api\/doses\/\d+\/(delete|time)$/ },
   ],
   write: [
     { method: 'POST', path: /^\/api\/members$/ },
