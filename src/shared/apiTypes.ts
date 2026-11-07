@@ -213,6 +213,9 @@ export interface DoseLog {
   doseDate: string;
   slot: string;
   status: 'taken' | 'skipped';
+  /** 實際吃藥時間 'YYYY-MM-DD HH:MM'（使用者填的，預設按下去的時間）；跳過的是 null */
+  takenAt: string | null;
+  /** 按下去（最後一次改）的時間 */
   loggedAt: string;
   loggedBy: string;
 }
@@ -222,6 +225,8 @@ export interface TodayResponse {
   date: string;
   members: Member[];
   medications: Medication[];
+  /** 這些藥是哪幾次看診開的（每一包標哪家診所、哪位醫生） */
+  visits: Visit[];
   doseLogs: DoseLog[];
   followUps: { visitId: number; memberId: number; date: string; clinic: string }[];
   runner: RunnerState;

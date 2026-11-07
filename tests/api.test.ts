@@ -16,6 +16,7 @@ import type {
 import { accessAudiences, agentMayCall, tokenMayCall } from '../src/worker/auth';
 import type { Env } from '../src/worker/env';
 import { app } from '../src/worker/index';
+import { reminderMessage } from '../src/worker/push';
 import { ageText } from '../src/worker/routes/agent';
 import { ShimD1 } from './helpers/d1Shim';
 import { ShimR2 } from './helpers/r2Shim';
@@ -397,6 +398,64 @@ describe('看診與用藥', () => {
     expect((await call('POST', `/medications/${cef}/stop`, { body: { reason: '醫生說可以停' } })).status).toBe(200);
   });
 
+  it('一包一包打勾：整包一起勾、填實際吃藥時間、整包取消；提醒寫哪一包', async () => {
+    const { dad, kid } = await seed();
+    const v = await call<{ id: number }>('POST', '/visits', {
+      body: { memberId: dad, visitDate: '2026-11-03', clinic: '聖青診所（高雄市前鎮區）', doctor: '謝醫師', medications: MEDS },
+    });
+    await call('POST', '/visits', {
+      body: { memberId: kid, visitDate: '2026-11-04', clinic: '小兒科', medications: [{ ...MEDS[2], name: '退燒藥水', category: '退燒止痛', slots: [], asNeeded: true, days: null }] },
+    });
+    const today = (await call<TodayResponse>('GET', '/today')).json;
+    expect(today.visits.map((x) => x.clinic).sort()).toEqual(['小兒科', '聖青診所（高雄市前鎮區）']);
+    const ids = today.medications.filter((m) => m.visitId === v.json.id).map((m) => m.id);
+    const prn = today.medications.find((m) => m.asNeeded)!.id;
+
+    // 早上那包（三種）一起勾，沒填時間＝現在（台北 13:00）
+    expect((await call('POST', '/doses', { body: { medicationIds: ids, date: '2026-11-04', slot: 'morning' } })).status).toBe(200);
+    let logs = (await call<TodayResponse>('GET', '/today')).json.doseLogs;
+    expect(logs).toHaveLength(3);
+    expect(logs.every((l) => l.takenAt === '2026-11-04 13:00')).toBe(true);
+    // 其實是 08:20 吃的：再送一次改時間
+    expect((await call('POST', '/doses', { body: { medicationIds: ids, date: '2026-11-04', slot: 'morning', takenAt: '2026-11-04 08:20' } })).status).toBe(200);
+    logs = (await call<TodayResponse>('GET', '/today')).json.doseLogs;
+    expect(logs).toHaveLength(3);
+    expect(logs.map((l) => l.takenAt)).toEqual(['2026-11-04 08:20', '2026-11-04 08:20', '2026-11-04 08:20']);
+    // 還沒到的時間、別天的時間不行；整包裡有一種沒排在這個時段（抗過敏中午不用吃）就整包不收
+    const bad = await call<{ error: string }>('POST', '/doses', { body: { medicationIds: ids, date: '2026-11-04', slot: 'morning', takenAt: '2026-11-04 13:30' } });
+    expect(bad.status).toBe(400);
+    expect(bad.json.error).toBe('吃藥時間不能晚於現在');
+    expect((await call('POST', '/doses', { body: { medicationIds: ids, date: '2026-11-03', slot: 'evening', takenAt: '2026-11-04 08:00' } })).status).toBe(400);
+    expect((await call('POST', '/doses', { body: { medicationIds: ids, date: '2026-11-04', slot: 'noon' } })).status).toBe(400);
+    expect((await call('POST', '/doses', { body: { medicationIds: [], date: '2026-11-04', slot: 'noon' } })).status).toBe(400);
+    // 昨天晚上那包半夜才吃
+    expect((await call('POST', '/doses', { body: { medicationIds: ids, date: '2026-11-03', slot: 'evening', takenAt: '2026-11-04 00:40' } })).status).toBe(200);
+    // 跳過不用時間
+    expect((await call('POST', '/doses', { body: { medicationIds: ids.slice(0, 2), date: '2026-11-03', slot: 'noon', status: 'skipped' } })).status).toBe(200);
+    logs = (await call<TodayResponse>('GET', '/today')).json.doseLogs;
+    expect(logs.filter((l) => l.status === 'skipped').map((l) => l.takenAt)).toEqual([null, null]);
+
+    // 中午的提醒：聖青那包（兩種）還沒吃
+    const noon = await reminderMessage(env(), '2026-11-04', 'noon');
+    expect(noon?.body).toBe('Nathan：聖青診所的藥（2 種）');
+    expect(await reminderMessage(env(), '2026-11-04', 'morning')).toBeNull();
+
+    // 整包取消
+    expect((await call('POST', '/doses/clear', { body: { medicationIds: ids, date: '2026-11-04', slot: 'morning' } })).status).toBe(200);
+    logs = (await call<TodayResponse>('GET', '/today')).json.doseLogs;
+    expect(logs.filter((l) => l.doseDate === '2026-11-04')).toHaveLength(0);
+
+    // 需要時吃的：記一次、改那一次的時間
+    expect((await call('POST', '/doses', { body: { medicationId: prn, date: '2026-11-04', slot: 'prn', takenAt: '2026-11-04 10:15' } })).status).toBe(200);
+    const once = (await call<TodayResponse>('GET', '/today')).json.doseLogs.find((l) => l.slot === 'prn')!;
+    expect(once.takenAt).toBe('2026-11-04 10:15');
+    expect((await call('POST', `/doses/${once.id}/time`, { body: { takenAt: '2026-11-04 09:50' } })).status).toBe(200);
+    expect((await call('POST', `/doses/${once.id}/time`, { body: { takenAt: '2026-11-05 09:50' } })).status).toBe(400);
+    expect((await call<TodayResponse>('GET', '/today')).json.doseLogs.find((l) => l.slot === 'prn')!.takenAt).toBe('2026-11-04 09:50');
+    expect(tokenMayCall('log', 'POST', `http://x/api/doses/${once.id}/time`)).toBe(true);
+    expect(tokenMayCall('read', 'POST', `http://x/api/doses/${once.id}/time`)).toBe(false);
+  });
+
   it('作廢看診連藥一起不見；回診日不能早於看診日', async () => {
     const { dad } = await seed();
     expect((await call('POST', '/visits', { body: { memberId: dad, visitDate: '2026-11-03', followUpDate: '2026-11-01' } })).status).toBe(400);
@@ -431,7 +490,9 @@ describe('Dr.Claude', () => {
   it('問問題 → runner 領走 → 讀內容 → 回覆並幫忙記日記與體溫', async () => {
     const { dad } = await seed();
     await call('PATCH', '/users/me', { body: { memberId: dad } });
-    await call('POST', '/visits', { body: { memberId: dad, visitDate: '2026-11-03', clinic: '聖青診所', medications: MEDS } });
+    const visit = await call<{ id: number }>('POST', '/visits', { body: { memberId: dad, visitDate: '2026-11-03', clinic: '聖青診所', medications: MEDS } });
+    const visitMeds = (await call<VisitDetail>('GET', `/visits/${visit.json.id}`)).json.medications;
+    await call('POST', '/doses', { body: { medicationIds: visitMeds.map((m) => m.id), date: '2026-11-04', slot: 'morning', takenAt: '2026-11-04 08:20' } });
     const conv = await call<{ id: number; memberId: number }>('POST', '/chat/conversations', { body: {} });
     expect(conv.json.memberId).toBe(dad);
     const sent = await call<ConversationDetail>('POST', `/chat/conversations/${conv.json.id}/messages`, { body: { body: '尿尿會火熱，體溫 37.6，要緊嗎？' } });
@@ -447,6 +508,8 @@ describe('Dr.Claude', () => {
     expect(ctx.json.asker.memberId).toBe(dad);
     expect(ctx.json.conversation?.messages.at(-1)?.body).toContain('尿尿');
     expect(ctx.json.activeMedications.map((m) => m.progress)[0]).toContain('第 2/3 天');
+    // 實際吃藥時間：Dr.水獺 才知道上一包是幾點吃的
+    expect(ctx.json.activeMedications.map((m) => m.progress)[0]).toContain('最近一次 2026-11-04 08:20 吃');
     expect(ctx.json.members[0].ageText).toBe('41 歲');
 
     const done = await call('POST', `/agent/jobs/${claim.json.id}/complete`, {

@@ -81,6 +81,14 @@ export async function loadVisits(db: D1Database, opts: { memberId?: number; sinc
   return rows.map(toVisit);
 }
 
+/** 這幾次看診（今天頁、提醒要知道每一包是哪家診所開的）；作廢的不算 */
+export async function loadVisitsByIds(db: D1Database, ids: (number | null)[]): Promise<Visit[]> {
+  const list = [...new Set(ids.filter((id): id is number => !!id))];
+  if (list.length === 0) return [];
+  const rows = await all<VisitRow>(db, `SELECT * FROM visits WHERE voided_at IS NULL AND id IN (${list.map(() => '?').join(',')})`, ...list);
+  return rows.map(toVisit);
+}
+
 export async function loadNotes(db: D1Database, opts: { memberId?: number; since?: string; limit?: number } = {}): Promise<HealthNote[]> {
   const where = ['voided_at IS NULL'];
   const params: (string | number)[] = [];

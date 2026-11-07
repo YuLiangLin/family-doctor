@@ -97,6 +97,20 @@ const visit = await api('POST', '/visits', {
     { name: 'FEXODINE 60MG', genericName: 'Fexofenadine', category: '抗過敏', slots: ['morning', 'evening'], days: 3, cautions: '避免與果汁併服' },
   ],
 });
+// 同一天另一位醫生：早上分飯前、飯後兩包，睡前一包（一包一包打勾要分得出是哪個醫生的哪份藥）
+await api('POST', '/visits', {
+  memberId: dad,
+  visitDate: today,
+  clinic: '測試皮膚科診所（高雄市前鎮區）',
+  department: '皮膚科',
+  doctor: '王醫師',
+  reason: '手臂起疹子',
+  medications: [
+    { name: 'FAMOTIDINE 20MG', genericName: 'Famotidine', category: '胃藥', slots: ['morning', 'evening'], timing: 'before', days: 3 },
+    { name: 'PREDNISOLONE 5MG', genericName: 'Prednisolone', category: '類固醇', slots: ['morning', 'evening'], days: 3 },
+    { name: 'HYDROXYZINE 25MG', genericName: 'Hydroxyzine', category: '止癢', slots: ['bedtime'], days: 3, cautions: '會想睡' },
+  ],
+});
 await api('POST', '/medications', { memberId: kid, startDate: today, name: '退燒藥水', category: '退燒止痛', dose: '依藥袋', asNeeded: true });
 const meds = (await api('GET', `/visits/${visit.id}`)).medications;
 // 藥品照片：前兩種藥對到食藥署那一款（第三種留著顯示「加照片」）
@@ -108,9 +122,11 @@ for (const m of meds.slice(0, 2)) {
   picked.push(c[0].licenseNo);
 }
 processDrugPhotos(picked);
-await api('POST', '/doses', { medicationId: meds[0].id, date: yesterday, slot: 'noon' });
-await api('POST', '/doses', { medicationId: meds[0].id, date: today, slot: 'morning' });
-await api('POST', '/doses', { medicationId: meds[2].id, date: today, slot: 'morning' });
+await api('POST', '/doses', { medicationIds: [meds[0].id, meds[1].id], date: yesterday, slot: 'noon', takenAt: `${yesterday} 13:05` });
+// 早上那包只勾了兩種（顯示 2/3），08:10 吃的（還不到 08:10 就用現在）
+const nowHm = new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16);
+const morningAt = nowHm < '08:10' ? nowHm : '08:10';
+await api('POST', '/doses', { medicationIds: [meds[0].id, meds[2].id], date: today, slot: 'morning', takenAt: `${today} ${morningAt}` });
 await api('POST', '/notes', { memberId: dad, notedAt: `${yesterday} 21:30`, body: '下班手腳冰冷，九點半就睡了', severity: 2 });
 await api('POST', '/notes', { memberId: dad, notedAt: `${today} 13:18`, body: '好一點；擤出黃灰色鼻涕，左邊有一點血，中午又昏睡，有點頭昏', severity: 2 });
 await api('POST', '/measurements', { memberId: dad, kind: 'temperature', value: 37.2, measuredAt: `${yesterday} 20:00` });
@@ -158,13 +174,29 @@ for (const scheme of ['light', 'dark']) {
   const shot = shooter(page, scheme);
   await shot('/', 'today');
   if (scheme === 'light') {
-    // 打勾：中午那包抗生素
-    const tick = page.getByRole('button', { name: /CEPHALEXIN 500MG 中午按一下記已吃/ });
-    if (await tick.count()) {
-      await tick.click();
-      await page.waitForTimeout(900);
-      await page.screenshot({ path: `${SHOTS}${scheme}-today-ticked.png` });
+    // 點時間改吃藥時間（早上那包只勾了兩種）
+    await page.getByRole('button', { name: new RegExp(`${morningAt} 吃的，按一下改時間`) }).first().click();
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${SHOTS}${scheme}-today-time.png` });
+    await page.getByRole('dialog').getByRole('button', { name: /^剛剛/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: /^改成/ }).click();
+    await page.waitForTimeout(700);
+    // 打開早上那包，看每一種
+    await page.locator('.pack-list').first().click();
+    await page.waitForTimeout(400);
+    await page.locator('.pack-meds').first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${SHOTS}${scheme}-today-pack-open.png` });
+    // 整包打勾：皮膚科早上飯前那包；早上已經過了（11 點以後跑）會先問幾點吃的
+    await page.getByRole('button', { name: /測試皮膚科診所（早餐飯前）早上那包（1 種藥）按一下整包記已吃/ }).click();
+    await page.waitForTimeout(500);
+    const sheet = page.getByRole('dialog');
+    if (await sheet.count()) {
+      await page.screenshot({ path: `${SHOTS}${scheme}-today-late.png` });
+      await sheet.getByRole('button', { name: /^記下/ }).click();
     }
+    await page.waitForTimeout(900);
+    if (!(await page.getByRole('button', { name: /測試皮膚科診所（早餐飯前）早上那包（1 種藥）已吃/ }).count())) errors.push('整包打勾沒有成功');
+    await page.screenshot({ path: `${SHOTS}${scheme}-today-ticked.png`, fullPage: true });
   }
   // 站內換頁（不重新載入）：換頁時 effect 的 cleanup 出錯會整頁變白，下面的整頁載入測不到
   for (const name of ['紀錄', 'Dr.水獺', '家人', '今天']) {
@@ -198,6 +230,7 @@ for (const scheme of ['light', 'dark']) {
     await page.screenshot({ path: `${SHOTS}${scheme}-visit-drug-suggest.png` });
     // 今天頁：點藥品照片看大圖
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    await page.locator('.pack-list').filter({ hasText: 'CEPHALEXIN' }).first().click();
     await page.getByRole('button', { name: /看 CEPHALEXIN 500MG 的照片/ }).first().click();
     await page.waitForTimeout(1200);
     await page.screenshot({ path: `${SHOTS}${scheme}-drug-lightbox.png` });

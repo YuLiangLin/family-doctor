@@ -3,7 +3,7 @@
 // 寫入紀錄只能經「完成」帶的 actions：日記、量測直接存（標 Dr.水獺 記的），看診＋用藥只會是草稿，要人在畫面按確認才存。
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { MEASUREMENT_INFO, type AgentJobContext, type ChatAction, type MeasurementKind, type Medication, type VisitDraft } from '../../shared/apiTypes';
+import { MEASUREMENT_INFO, type AgentJobContext, type ChatAction, type DoseLog, type MeasurementKind, type Medication, type VisitDraft } from '../../shared/apiTypes';
 import { addDays, daysBetween, taipeiNow, taipeiToday } from '../../shared/dates';
 import { courseProgress, scheduleLabel } from '../../shared/meds';
 import { all, first, run, stmt } from '../db';
@@ -109,12 +109,20 @@ async function jobAttachmentIds(db: D1Database, job: JobRow): Promise<number[]> 
   return [...ids];
 }
 
-function progressText(m: Medication, logs: Parameters<typeof courseProgress>[1], today: string): string {
+function progressText(m: Medication, logs: DoseLog[], today: string): string {
   const p = courseProgress(m, logs, today);
-  if (m.asNeeded) return `需要時吃，已記錄吃過 ${logs.filter((l) => l.medicationId === m.id).length} 次`;
-  const parts = [p.totalDays ? `第 ${Math.min(p.dayNo, p.totalDays)}/${p.totalDays} 天` : `第 ${p.dayNo} 天（長期）`, `打勾吃了 ${p.taken} 包`];
-  if (p.remaining !== null) parts.push(`還剩 ${p.remaining} 包`);
-  if (p.missedBeforeToday) parts.push(`之前有 ${p.missedBeforeToday} 包沒打勾`);
+  // 實際吃藥時間（家人填的，不一定是表定時間）：問「可以吃下一包了嗎」時要知道上一次是幾點
+  const last = logs
+    .filter((l) => l.medicationId === m.id && l.takenAt)
+    .map((l) => l.takenAt!)
+    .sort()
+    .pop();
+  const lastText = last ? `最近一次 ${last} 吃` : '';
+  if (m.asNeeded) return [`需要時吃，已記錄吃過 ${logs.filter((l) => l.medicationId === m.id).length} 次`, lastText].filter(Boolean).join('，');
+  const parts = [p.totalDays ? `第 ${Math.min(p.dayNo, p.totalDays)}/${p.totalDays} 天` : `第 ${p.dayNo} 天（長期）`, `打勾吃了 ${p.taken} 次`];
+  if (lastText) parts.push(lastText);
+  if (p.remaining !== null) parts.push(`還剩 ${p.remaining} 次`);
+  if (p.missedBeforeToday) parts.push(`之前有 ${p.missedBeforeToday} 次沒打勾`);
   if (m.stoppedAt) parts.push(`${m.stoppedAt} 停藥（${m.stopReason || '沒寫原因'}）`);
   return parts.join('，');
 }
